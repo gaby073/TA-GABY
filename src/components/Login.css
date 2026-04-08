@@ -1,0 +1,99 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+.left-section {
+  flex: 1;
+  background: linear-gradient(135deg, #ffc0cb 0%, #ffb6c1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.shop-image {
+  max-width: 600px;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.shop-placeholder {
+  font-size: 72px;
+  font-weight: bold;
+  color: #ff1493;
+  text-align: center;
+  padding: 100px 40px;
+  letter-spacing: 4px;
+}
+
+.right-section {
+  flex: 1;
+  background: #fef5f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.welcome-text {
+  font-size: 48px;
+  color: #000000;
+  margin-bottom: 60px;
+  letter-spacing: 8px;
+}
+
+form {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.input-field {
+  width: 100%;
+  padding: 20px 30px;
+  border: none;
+  border-radius: 50px;
+  background: #ffb6c1;
+  font-size: 16px;
+  color: #333;
+  outline: none;
+}
+
+.input-field::placeholder {
+  color: #666;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 20px;
+  border: none;
+  border-radius: 50px;
+  background: #ff69b4;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 20px;
+  letter-spacing: 2px;
+}
+
+.login-btn:hover {
+  background: #ff1493;
+}

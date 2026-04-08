@@ -1,0 +1,259 @@
+<?php
+// API for sales transactions (penjualan)
+
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, DELETE');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json');
+
+require_once '../config.php';
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+switch($method) {
+    case 'GET':
+        // Get transactions - support filtering
+        $filter = $_GET['filter'] ?? 'all';
+        $date = $_GET['date'] ?? date('Y-m-d');
+        $stats = $_GET['stats'] ?? false;
+        
+        if ($stats) {
+            // Get sales statistics per product
+            $stmt = $pdo->query("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC");
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode($data);
+            break;
+        }
+        
+        if ($filter === 'custom') {
+            // Get transactions within custom date range
+            $startDate = $_GET['start_date'] ?? date('Y-m-d', strtotime('-14 days'));
+            $endDate = $_GET['end_date'] ?? date('Y-m-d');
+            $stmt = $pdo->prepare("SELECT id_barang, nama_barang, SUM(jumlah) as jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as keuntungan FROM penjualan WHERE DATE(waktu) BETWEEN ? AND ? GROUP BY id_barang, nama_barang ORDER BY jumlah DESC");
+            $stmt->execute([$startDate, $endDate]);
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode($data);
+            break;
+        }
+        
+        if ($filter === 'daily') {
+            // Get today's transactions grouped by waktu (timestamp)
+            $stmt = $pdo->prepare("SELECT waktu, SUM(jumlah) as total_jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as total_keuntungan, GROUP_CONCAT(nama_barang SEPARATOR ', ') as nama_barang_list FROM penjualan WHERE DATE(waktu) = ? GROUP BY waktu ORDER BY waktu DESC, id_penjualan DESC");
+            $stmt->execute([$date]);
+        } elseif ($filter === 'monthly') {
+            // Get this month's transactions grouped by waktu
+            $yearMonth = date('Y-m', strtotime($date));
+            $stmt = $pdo->prepare("SELECT waktu, SUM(jumlah) as total_jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as total_keuntungan, GROUP_CONCAT(nama_barang SEPARATOR ', ') as nama_barang_list FROM penjualan WHERE DATE_FORMAT(waktu, '%Y-%m') = ? GROUP BY waktu ORDER BY waktu DESC, id_penjualan DESC");
+            $stmt->execute([$yearMonth]);
+        } else {
+            // Get all transactions grouped by waktu
+            $stmt = $pdo->query("SELECT waktu, SUM(jumlah) as total_jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as total_keuntungan, GROUP_CONCAT(nama_barang SEPARATOR ', ') as nama_barang_list FROM penjualan GROUP BY waktu ORDER BY waktu DESC, id_penjualan DESC");
+        }
+        
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($data);
+        break;
+        
+    case 'POST':
+        // Add new transaction
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        // Check if receiving multiple items (new format) or single item (legacy format)
+        if (isset($data['items']) && is_array($data['items'])) {
+            // New format: multiple items in one transaction
+            $items = $data['items'];
+            
+            // Validate: must have at least one item
+            if (count($items) == 0) {
+                echo json_encode(['success' => false, 'message' => 'Minimal harus ada 1 item']);
+                break;
+            }
+            
+            // Calculate combined totals
+            $totalJumlah = 0;
+            $totalHarga = 0;
+            $totalKeuntungan = 0;
+            $namaBarangList = [];
+            $errors = [];
+            
+            foreach ($items as $index => $item) {
+                $idBarang = $item['id_barang'] ?? '';
+                $jumlah = intval($item['jumlah'] ?? 0);
+                $currentStok = intval($item['current_stok'] ?? 0);
+                
+                // Validate each item
+                if (empty($idBarang)) {
+                    $errors[] = 'Item #' . ($index + 1) . ': ID barang tidak boleh kosong';
+                }
+                if ($jumlah <= 0) {
+                    $errors[] = 'Item #' . ($index + 1) . ': Jumlah harus lebih dari 0';
+                }
+                if ($jumlah > $currentStok) {
+                    $errors[] = 'Item #' . ($index + 1) . ': Stok tidak mencukupi';
+                }
+                
+                $totalJumlah += $jumlah;
+                $totalHarga += floatval($item['total'] ?? $item['total_harga'] ?? 0);
+                $totalKeuntungan += floatval($item['keuntungan'] ?? 0);
+                $namaBarangList[] = $item['nama_barang'] ?? '';
+            }
+            
+            // If there are errors, return them
+            if (count($errors) > 0) {
+                echo json_encode(['success' => false, 'message' => implode('. ', $errors)]);
+                break;
+            }
+            
+            foreach ($items as $item) {
+                // Update stock for each item
+                $idBarang = $item['id_barang'] ?? '';
+                $currentStok = intval($item['current_stok'] ?? 0);
+                $jumlah = intval($item['jumlah'] ?? 0);
+                $newStok = $currentStok - $jumlah;
+                if ($newStok < 0) $newStok = 0;
+                
+                $stmt2 = $pdo->prepare("UPDATE barang SET stok_total = ? WHERE id_barang = ?");
+                $stmt2->execute([$newStok, $idBarang]);
+            }
+            
+            // Combine all item names with quantities
+            $detailList = [];
+            foreach ($items as $item) {
+                $detailList[] = ($item['nama_barang'] ?? '') . ': ' . ($item['jumlah'] ?? 0) . ' pcs';
+            }
+            $namaBarang = implode(', ', $detailList);
+            $negativeJumlah = -$totalJumlah;
+            
+            try {
+                // Insert combined transaction into history_penjualan
+                $stmt3 = $pdo->prepare("INSERT INTO history_penjualan (id_barang, nama_barang, jumlah, harga_jual, total_harga, keuntungan) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt3->execute([0, $namaBarang, $negativeJumlah, 0, $totalHarga, $totalKeuntungan]);
+                
+                // Also insert each item into penjualan table
+                foreach ($items as $item) {
+                    $stmt = $pdo->prepare("INSERT INTO penjualan (id_barang, nama_barang, harga_beli_pcs, harga_jual, jumlah, total_harga, keuntungan) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([
+                        $item['id_barang'] ?? '',
+                        $item['nama_barang'] ?? '',
+                        $item['harga_beli_pcs'] ?? 0,
+                        $item['harga_jual'] ?? 0,
+                        $item['jumlah'] ?? 0,
+                        $item['total'] ?? $item['total_harga'] ?? 0,
+                        $item['keuntungan'] ?? 0
+                    ]);
+                }
+                
+                echo json_encode(['success' => true, 'message' => 'Transaksi berhasil disimpan']);
+            } catch(PDOException $e) {
+                echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+            }
+        } else {
+            // Legacy format: single item
+            $id_barang = $data['id_barang'] ?? '';
+            $nama_barang = $data['nama_barang'] ?? '';
+            $harga_beli_pcs = floatval($data['harga_beli_pcs'] ?? 0);
+            $harga_jual = floatval($data['harga_jual'] ?? 0);
+            $jumlah = intval($data['jumlah'] ?? 0);
+            $total_harga = floatval($data['total_harga'] ?? ($data['total'] ?? 0));
+            $keuntungan = floatval($data['keuntungan'] ?? 0);
+            $currentStok = intval($data['current_stok'] ?? 0);
+            
+            // Validate
+            $errors = [];
+            if (empty($id_barang)) {
+                $errors[] = 'ID barang tidak boleh kosong';
+            }
+            if ($jumlah <= 0) {
+                $errors[] = 'Jumlah harus lebih dari 0';
+            }
+            if ($jumlah > $currentStok) {
+                $errors[] = 'Stok tidak mencukupi';
+            }
+            if ($total_harga < 0) {
+                $errors[] = 'Total harga tidak boleh negatif';
+            }
+            if ($keuntungan < 0) {
+                $errors[] = 'Keuntungan tidak boleh negatif';
+            }
+            
+            if (count($errors) > 0) {
+                echo json_encode(['success' => false, 'message' => implode('. ', $errors)]);
+                break;
+            }
+            
+            try {
+                // Insert transaction into penjualan table
+                $stmt = $pdo->prepare("INSERT INTO penjualan (id_barang, nama_barang, harga_beli_pcs, harga_jual, jumlah, total_harga, keuntungan) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                
+                if($stmt->execute([$id_barang, $nama_barang, $harga_beli_pcs, $harga_jual, $jumlah, $total_harga, $keuntungan])) {
+                    // Also insert into history_penjualan with negative quantity
+                    $stmt3 = $pdo->prepare("INSERT INTO history_penjualan (id_barang, nama_barang, jumlah, harga_jual, total_harga, keuntungan) VALUES (?, ?, ?, ?, ?, ?)");
+                    $negativeJumlah = -$jumlah;
+                    $stmt3->execute([$id_barang, $nama_barang, $negativeJumlah, $harga_jual, $total_harga, $keuntungan]);
+                    
+                    // Update stock in barang table
+                    $newStok = $currentStok - $jumlah;
+                    if ($newStok < 0) $newStok = 0;
+                    
+                    $stmt2 = $pdo->prepare("UPDATE barang SET stok_total = ? WHERE id_barang = ?");
+                    $stmt2->execute([$newStok, $id_barang]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Transaksi berhasil disimpan']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Gagal menyimpan transaksi']);
+                }
+            } catch(PDOException $e) {
+                echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+            }
+        }
+        break;
+        
+    case 'DELETE':
+        // Delete transaction(s) by waktu (timestamp)
+        $waktu = $_GET['waktu'] ?? '';
+        $id = $_GET['id'] ?? '';
+        
+        if ($waktu) {
+            // Delete all transactions with the same waktu timestamp
+            // First get transactions to restore stock
+            $stmt = $pdo->prepare("SELECT * FROM penjualan WHERE waktu = ?");
+            $stmt->execute([$waktu]);
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Restore stock for each item
+            foreach ($transactions as $transaction) {
+                $stmt2 = $pdo->prepare("UPDATE barang SET stok_total = stok_total + ? WHERE id_barang = ?");
+                $stmt2->execute([$transaction['jumlah'], $transaction['id_barang']]);
+            }
+            
+            // Delete all transactions with same waktu
+            $stmt = $pdo->prepare("DELETE FROM penjualan WHERE waktu = ?");
+            if($stmt->execute([$waktu])) {
+                echo json_encode(['success' => true, 'message' => 'Transaksi berhasil dihapus']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Gagal menghapus transaksi']);
+            }
+        } elseif ($id) {
+            // Get transaction first to restore stock (legacy single delete)
+            $stmt = $pdo->prepare("SELECT * FROM penjualan WHERE id_penjualan = ?");
+            $stmt->execute([$id]);
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($transaction) {
+                // Restore stock
+                $stmt2 = $pdo->prepare("UPDATE barang SET stok_total = stok_total + ? WHERE id_barang = ?");
+                $stmt2->execute([$transaction['jumlah'], $transaction['id_barang']]);
+            }
+            
+            $stmt = $pdo->prepare("DELETE FROM penjualan WHERE id_penjualan = ?");
+            if($stmt->execute([$id])) {
+                echo json_encode(['success' => true, 'message' => 'Transaksi berhasil dihapus']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Gagal menghapus transaksi']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'message' => 'waktu atau id diperlukan']);
+        }
+        break;
+}
+?>

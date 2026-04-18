@@ -4,7 +4,7 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost',
+      target: 'http://localhost/TA-GABY',
       changeOrigin: true,
     })
   );

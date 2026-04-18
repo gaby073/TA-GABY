@@ -97,3 +97,61 @@ form {
 .login-btn:hover {
   background: #ff1493;
 }
+
+.error-message {
+  color: #dc3545;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.success-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+.success-modal-content {
+  background: #28a745;
+  padding: 40px 60px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  animation: scaleIn 0.3s ease;
+}
+
+.success-modal-content .success-icon {
+  font-size: 48px;
+  color: white;
+  margin-bottom: 15px;
+}
+
+.success-modal-content p {
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  margin: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

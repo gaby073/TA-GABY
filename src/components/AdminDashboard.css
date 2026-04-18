@@ -198,16 +198,64 @@ html, body {
 .content-section h2 {
   color: #2c3e50;
   font-size: 20px;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #3498db;
   display: flex;
   align-items: center;
   gap: 10px;
+  margin: 0;
 }
 
 .content-section h2 i {
   color: #3498db;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #3498db;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.section-header h2 {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.export-buttons .btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-buttons .btn-success {
+  background: #28a745;
+}
+
+.export-buttons .btn-success:hover {
+  background: #218838;
+}
+
+.export-buttons .btn-danger {
+  background: #dc3545;
+}
+
+.export-buttons .btn-danger:hover {
+  background: #c82333;
 }
 
 /* Table Styles */

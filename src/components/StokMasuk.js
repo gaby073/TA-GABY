@@ -22,6 +22,7 @@ function StokMasuk() {
     stok_awal: 0
   });
   const [message, setMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const userData = localStorage.getItem('user');
   if (!userData) {
@@ -38,7 +39,7 @@ function StokMasuk() {
   const fetchBarang = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/barang.php');
+      const response = await axios.get('/api/barang.php?_t=' + Date.now());
       console.log('Response from API:', response.data);
       const data = response.data;
       if (Array.isArray(data)) {
@@ -207,6 +208,8 @@ function StokMasuk() {
       await axios.post('/api/stok_masuk.php', historyData);
       
       setMessage('Stok berhasil ditambahkan!');
+      setShowSuccessModal(true);
+      setTimeout(() => setShowSuccessModal(false), 1500);
       
       // Update local state immediately with new stock values
       const addedStock = totalPcs;
@@ -281,6 +284,90 @@ function StokMasuk() {
 
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  };
+
+  const exportToExcel = (data) => {
+    const headers = ['No', 'ID', 'Nama', 'Satuan', 'Isi', 'Stok Awal', 'Stok Masuk', 'Stok Total', 'Keterangan', 'Tanggal'];
+    const rows = data.map((item, index) => [
+      index + 1,
+      item.id_barang,
+      item.nama_barang,
+      item.satuan_beli,
+      item.isi_satuan,
+      item.stok_awal || 0,
+      item.stok_masuk || 0,
+      item.stok_total || 0,
+      item.keterangan || '-',
+      item.tanggal_masuk ? new Date(item.tanggal_masuk).toLocaleString('id-ID') : '-'
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `riwayat_stok_masuk_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const exportToPDF = (data) => {
+    const printWindow = window.open('', '_blank');
+    const tableRows = data.map((item, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${item.id_barang}</td>
+        <td>${item.nama_barang || '-'}</td>
+        <td>${item.satuan_beli || '-'}</td>
+        <td>${item.isi_satuan || '-'}</td>
+        <td>${item.stok_awal || 0}</td>
+        <td style={{color: 'green', fontWeight: 'bold'}}>+${item.stok_masuk || 0}</td>
+        <td>${item.stok_total || 0}</td>
+        <td>${item.keterangan || '-'}</td>
+        <td>${item.tanggal_masuk ? new Date(item.tanggal_masuk).toLocaleString('id-ID') : '-'}</td>
+      </tr>
+    `).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Export PDF - Riwayat Stok Masuk</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
+          th { background-color: #667eea; color: white; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <h1>Riwayat Stok Masuk - Berty Shop</h1>
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>ID</th>
+              <th>Nama</th>
+              <th>Satuan</th>
+              <th>Isi</th>
+              <th>Stok Awal</th>
+              <th>Stok Masuk</th>
+              <th>Stok Total</th>
+              <th>Keterangan</th>
+              <th>Tanggal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const user = userData ? JSON.parse(userData) : null;
@@ -456,7 +543,17 @@ function StokMasuk() {
 
         {/* Table Section - Stock History */}
         <div className="table-card">
-          <h3>RIWAYAT STOK MASUK ({stokMasukHistory.length})</h3>
+          <div className="table-header-row">
+            <h3>RIWAYAT STOK MASUK ({stokMasukHistory.length})</h3>
+            <div className="export-buttons">
+              <button className="btn btn-success" onClick={() => exportToExcel(stokMasukHistory)}>
+                <i className="fas fa-file-excel"></i> Export Excel
+              </button>
+              <button className="btn btn-danger" onClick={() => exportToPDF(stokMasukHistory)}>
+                <i className="fas fa-file-pdf"></i> Export PDF
+              </button>
+            </div>
+          </div>
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -501,6 +598,15 @@ function StokMasuk() {
           </div>
         </div>
       </div>
+
+      {showSuccessModal && (
+        <div className="success-modal-overlay">
+          <div className="success-modal-content">
+            <div className="success-icon">✓</div>
+            <p>Berhasil ditambahkan</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

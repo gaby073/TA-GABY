@@ -3,6 +3,8 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 require_once '../config.php';
 
@@ -26,7 +28,7 @@ switch($method) {
             break;
         }
         
-        // Get all barang
+        // Get all barang - get all columns
         $stmt = $pdo->query("SELECT * FROM barang ORDER BY id_barang DESC");
         $barang = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($barang);

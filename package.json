@@ -28,5 +28,8 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost"
+  "proxy": "http://localhost",
+  "engines": {
+    "node": ">=14"
+  }
 }

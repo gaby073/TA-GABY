@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../utils/api';
 import './OwnerDashboard.css';
 
 function OwnerDashboard() {
@@ -15,6 +15,7 @@ function OwnerDashboard() {
   const [activeMenu, setActiveMenu] = useState(() => {
     return localStorage.getItem('ownerActiveMenu') || 'dashboard';
   });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const navigate = useNavigate();
 
   const formatRupiah = (angka) => {
@@ -33,7 +34,7 @@ function OwnerDashboard() {
       item.persen_untungk,
       item.harga_jual - item.harga_beli_pcs,
       item.harga_jual,
-      item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'
+      item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'
     ]);
     
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -57,7 +58,7 @@ function OwnerDashboard() {
         <td>${item.persen_untungk}%</td>
         <td>${formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
         <td>${formatRupiah(item.harga_jual)}</td>
-        <td>${item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+        <td>${item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
       </tr>
     `).join('');
     
@@ -123,17 +124,20 @@ function OwnerDashboard() {
         fetchData();
       }
     }
-  }, [navigate]);
+  }, [navigate, window.performance?.navigation?.type]);
 
   const fetchData = async () => {
     try {
-      // Fetch barang
-      const barangResponse = await axios.get('/api/barang.php');
+      // Force refresh from server
+      const barangResponse = await api.get('/barang.php', { 
+        headers: { 'Pragma': 'no-cache' },
+        params: { _t: Date.now(), _r: Math.random() } 
+      });
       const barangData = Array.isArray(barangResponse.data) ? barangResponse.data : [];
       setBarang(barangData);
 
       // Fetch penjualan for stats
-      const penjualanResponse = await axios.get('/api/penjualan.php?filter=all');
+      const penjualanResponse = await api.get('/penjualan.php?filter=all');
       const penjualanData = Array.isArray(penjualanResponse.data) ? penjualanResponse.data : [];
 
       // Calculate stats
@@ -147,7 +151,7 @@ function OwnerDashboard() {
       });
 
       // Fetch sales statistics per product
-      const salesStatsResponse = await axios.get('/api/penjualan.php?stats=true');
+      const salesStatsResponse = await api.get('/penjualan.php?stats=true');
       const salesStatsData = Array.isArray(salesStatsResponse.data) ? salesStatsResponse.data : [];
       setSalesStats(salesStatsData);
     } catch (error) {
@@ -156,8 +160,17 @@ function OwnerDashboard() {
   };
 
   const handleLogout = () => {
+    setShowConfirmModal(true);
+  };
+
+  const handleLogoutYes = () => {
+    setShowConfirmModal(false);
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const handleLogoutNo = () => {
+    setShowConfirmModal(false);
   };
 
   const renderContent = () => {
@@ -236,7 +249,7 @@ function OwnerDashboard() {
                         <td>{item.persen_untungk}%</td>
                         <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
                         <td>{formatRupiah(item.harga_jual)}</td>
-                        <td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+<td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                       </tr>
                     ))
                   ) : (
@@ -305,6 +318,19 @@ function OwnerDashboard() {
       <div className="owner-main-content">
         {renderContent()}
       </div>
+
+      {showConfirmModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal-content">
+            <h3>Konfirmasi Logout</h3>
+            <p>Apakah Anda yakin ingin logout?</p>
+            <div className="confirm-modal-buttons">
+              <button className="btn-confirm-yes" onClick={handleLogoutYes}>YA</button>
+              <button className="btn-confirm-no" onClick={handleLogoutNo}>TIDAK</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -324,7 +350,7 @@ function LaporanKeuntungan() {
 
   const fetchTransactions = async () => {
     try {
-      const response = await axios.get(`/api/penjualan.php?filter=${filter}&date=${date}`);
+      const response = await api.get(`/penjualan.php?filter=${filter}&date=${date}`);
       const data = response.data;
       if (Array.isArray(data)) {
         setTransactions(data);
@@ -376,6 +402,85 @@ function LaporanKeuntungan() {
 
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  };
+
+  const exportToExcel = (data, isRecap = false) => {
+    const headers = isRecap 
+      ? ['No', filter === 'daily' ? 'Tanggal' : 'Bulan', 'Jumlah Transaksi', 'Total Penjualan', 'Total Keuntungan']
+      : ['No', 'Tanggal', 'Nama Barang', 'Jumlah Beli', 'Total Harga Jual', 'Total Keuntungan'];
+    const rows = data.map((item, index) => isRecap 
+      ? [index + 1, item.tanggal, item.jumlahTransaksi, item.totalPenjualan, item.totalKeuntungan]
+      : [index + 1, item.waktu ? new Date(item.waktu).toLocaleString('id-ID') : '-', item.nama_barang_list || '-', item.total_jumlah, item.total_harga, item.total_keuntungan]
+    );
+    
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `laporan_keuntungan_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const exportToPDF = (data, isRecap = false) => {
+    const printWindow = window.open('', '_blank');
+    const tableRows = data.map((item, index) => isRecap
+      ? `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.tanggal}</td>
+          <td>${item.jumlahTransaksi}</td>
+          <td>${formatRupiah(item.totalPenjualan)}</td>
+          <td>${formatRupiah(item.totalKeuntungan)}</td>
+        </tr>
+      `
+      : `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.waktu ? new Date(item.waktu).toLocaleString('id-ID') : '-'}</td>
+          <td>${item.nama_barang_list || '-'}</td>
+          <td>${item.total_jumlah}</td>
+          <td>${formatRupiah(item.total_harga)}</td>
+          <td style={{color: 'green'}}>${formatRupiah(item.total_keuntungan)}</td>
+        </tr>
+      `
+    ).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Laporan Keuntungan</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #667eea; color: white; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <h1>Laporan Keuntungan - Berty Shop</h1>
+        <table>
+          <thead>
+            <tr>
+              ${isRecap 
+                ? '<th>No</th><th>' + (filter === 'daily' ? 'Tanggal' : 'Bulan') + '</th><th>Jumlah Transaksi</th><th>Total Penjualan</th><th>Total Keuntungan</th>'
+                : '<th>No</th><th>Tanggal</th><th>Nama Barang</th><th>Jumlah Beli</th><th>Total Harga Jual</th><th>Total Keuntungan</th>'
+              }
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -453,7 +558,17 @@ function LaporanKeuntungan() {
       {showRecap ? (
         /* Rekap Table */
         <div className="content-section">
-          <h2>Rekap {filter === 'daily' ? 'Harian' : 'Bulanan'}</h2>
+          <div className="section-header">
+            <h2>Rekap {filter === 'daily' ? 'Harian' : 'Bulanan'}</h2>
+            <div className="export-buttons">
+              <button className="btn btn-success" onClick={() => exportToExcel(recapData, true)}>
+                <i className="fas fa-file-excel"></i> Export Excel
+              </button>
+              <button className="btn btn-danger" onClick={() => exportToPDF(recapData, true)}>
+                <i className="fas fa-file-pdf"></i> Export PDF
+              </button>
+            </div>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
@@ -486,6 +601,17 @@ function LaporanKeuntungan() {
       ) : (
         /* Transactions Table */
         <div className="content-section">
+          <div className="section-header">
+            <h2>Detail Transaksi</h2>
+            <div className="export-buttons">
+              <button className="btn btn-success" onClick={() => exportToExcel(transactions, false)}>
+                <i className="fas fa-file-excel"></i> Export Excel
+              </button>
+              <button className="btn btn-danger" onClick={() => exportToPDF(transactions, false)}>
+                <i className="fas fa-file-pdf"></i> Export PDF
+              </button>
+            </div>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
@@ -541,7 +667,7 @@ function ManajemenUser() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/users.php');
+      const response = await api.get('/users.php');
       setUsers(response.data);
       setLoading(false);
     } catch (error) {
@@ -553,7 +679,7 @@ function ManajemenUser() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/users.php', formData);
+      const response = await api.post('/users.php', formData);
       if (response.data.success) {
         alert(response.data.message);
         setShowModal(false);
@@ -571,7 +697,8 @@ function ManajemenUser() {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      password: '',
+      currentPassword: user.password || '',
+      newPassword: '',
       role: user.role
     });
     setShowEditModal(true);
@@ -580,17 +707,18 @@ function ManajemenUser() {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.put('/api/users.php', {
+      const passwordToUpdate = formData.newPassword || formData.currentPassword;
+      const response = await api.put('/users.php', {
         id: editingUser.id,
         username: formData.username,
         role: formData.role,
-        password: formData.password
+        password: passwordToUpdate
       });
       if (response.data.success) {
         alert(response.data.message);
         setShowEditModal(false);
         setEditingUser(null);
-        setFormData({ username: '', password: '', role: 'user' });
+        setFormData({ username: '', currentPassword: '', newPassword: '', role: 'user' });
         fetchUsers();
       } else {
         alert(response.data.message);
@@ -603,7 +731,7 @@ function ManajemenUser() {
   const handleDeleteUser = async (id) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus user ini?')) {
       try {
-        const response = await axios.delete(`/api/users.php?id=${id}`);
+        const response = await api.delete(`/users.php?id=${id}`);
         if (response.data.success) {
           alert(response.data.message);
           fetchUsers();
@@ -742,11 +870,21 @@ function ManajemenUser() {
                 />
               </div>
               <div className="form-group">
-                <label>Password (kosongkan jika tidak ingin mengubah)</label>
+                <label>Password Saat Ini</label>
                 <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  type="text"
+                  value={formData.currentPassword ? 'Password tersimpan' : 'Tidak ada password'}
+                  readOnly
+                  style={{backgroundColor: '#e9ecef', cursor: 'not-allowed', color: formData.currentPassword ? 'green' : 'red'}}
+                />
+              </div>
+              <div className="form-group">
+                <label>Ubah Password (kosongkan jika tidak ingin mengubah)</label>
+                <input
+                  type="text"
+                  value={formData.newPassword}
+                  onChange={(e) => setFormData({...formData, newPassword: e.target.value})}
+                  placeholder="Masukkan password baru"
                 />
               </div>
               <div className="form-group">
@@ -795,7 +933,7 @@ function TabelBarangOwner({ barang, salesStats }) {
   const fetchAnalysis = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`/api/penjualan.php?filter=custom&start_date=${startDate}&end_date=${endDate}`);
+      const response = await api.get(`/penjualan.php?filter=custom&start_date=${startDate}&end_date=${endDate}`);
       const data = response.data;
       
       if (Array.isArray(data) && data.length > 0) {
@@ -980,7 +1118,7 @@ function TabelBarangOwner({ barang, salesStats }) {
                   <td>{item.persen_untungk}%</td>
                   <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
                   <td>{formatRupiah(item.harga_jual)}</td>
-                  <td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+                  <td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                 </tr>
               ))
             ) : (

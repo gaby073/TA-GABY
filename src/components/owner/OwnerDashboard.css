@@ -264,6 +264,39 @@
   gap: 10px;
 }
 
+.section-header .export-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.section-header .export-buttons .btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-header .btn-success {
+  background: #28a745;
+}
+
+.section-header .btn-success:hover {
+  background: #218838;
+}
+
+.section-header .btn-danger {
+  background: #dc3545;
+}
+
+.section-header .btn-danger:hover {
+  background: #c82333;
+}
+
 /* Data Table */
 .data-table {
   width: 100%;
@@ -555,4 +588,89 @@
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Confirm Modal */
+.confirm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+.confirm-modal-content {
+  background: #28a745;
+  padding: 30px 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  animation: scaleIn 0.3s ease;
+  max-width: 400px;
+}
+
+.confirm-modal-content h3 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 20px;
+}
+
+.confirm-modal-content p {
+  color: white;
+  margin-bottom: 25px;
+  font-size: 16px;
+}
+
+.confirm-modal-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.btn-confirm-yes {
+  padding: 12px 40px;
+  background: white;
+  color: #28a745;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-confirm-yes:hover {
+  background: #f0f0f0;
+}
+
+.btn-confirm-no {
+  padding: 12px 40px;
+  background: white;
+  color: #dc3545;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-confirm-no:hover {
+  background: #f0f0f0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }

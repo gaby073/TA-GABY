@@ -10,6 +10,7 @@ function Laporan() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [user, setUser] = useState(null);
   const [totals, setTotals] = useState({ totalPenjualan: 0, totalKeuntungan: 0 });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -43,8 +44,17 @@ function Laporan() {
   };
 
   const handleLogout = () => {
+    setShowConfirmModal(true);
+  };
+
+  const handleLogoutYes = () => {
+    setShowConfirmModal(false);
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const handleLogoutNo = () => {
+    setShowConfirmModal(false);
   };
 
   const formatRupiah = (angka) => {
@@ -172,6 +182,19 @@ function Laporan() {
           </table>
         </div>
       </div>
+
+      {showConfirmModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal-content">
+            <h3>Konfirmasi Logout</h3>
+            <p>Apakah Anda yakin ingin logout?</p>
+            <div className="confirm-modal-buttons">
+              <button className="btn-confirm-yes" onClick={handleLogoutYes}>YA</button>
+              <button className="btn-confirm-no" onClick={handleLogoutNo}>TIDAK</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

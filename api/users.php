@@ -14,7 +14,7 @@ require_once '../config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
-        $stmt = $pdo->query("SELECT id, username, role, created_at FROM users ORDER BY created_at DESC");
+        $stmt = $pdo->query("SELECT id, username, password, role, created_at FROM users ORDER BY created_at DESC");
         $users = $stmt->fetchAll();
         
         echo json_encode($users);

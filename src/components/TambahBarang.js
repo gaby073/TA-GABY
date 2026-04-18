@@ -26,6 +26,7 @@ function TambahBarang() {
     harga_jual: 0
   });
   const [message, setMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const userData = localStorage.getItem('user');
   if (!userData) {
@@ -92,7 +93,7 @@ function TambahBarang() {
 
   const fetchBarang = async () => {
     try {
-      const response = await axios.get('/api/barang.php');
+      const response = await axios.get('/api/barang.php?_t=' + Date.now());
       const data = response.data;
       if (Array.isArray(data)) {
         setBarang(data);
@@ -171,15 +172,14 @@ function TambahBarang() {
       };
       
       if (isEditing) {
-        // Update existing barang
         await axios.put('/api/barang.php', dataToSend);
         setMessage('Barang berhasil diupdate!');
-        // Clear edit item from localStorage
         localStorage.removeItem('editItem');
       } else {
-        // Add new barang
         await axios.post('/api/barang.php', dataToSend);
         setMessage('Barang berhasil ditambahkan!');
+        setShowSuccessModal(true);
+        setTimeout(() => setShowSuccessModal(false), 1500);
       }
       
       fetchBarang();
@@ -261,9 +261,9 @@ function TambahBarang() {
                 <select name="satuan_beli" value={formData.satuan_beli} onChange={handleInputChange}>
                   <option value="DUS">DUS</option>
                   <option value="PACK">PACK</option>
-                  <option value="PCS">PCS</option>
-                  <option value="KG">KG</option>
-                  <option value="BOX">BOX</option>
+                  <option value="RENCENG">RENCENG</option>
+                  <option value="KALENG">KALENG</option>
+                  <option value="LUSIN">LUSIN</option>
                 </select>
               </div>
               <div className="form-group">
@@ -344,7 +344,7 @@ function TambahBarang() {
                       <td>{item.isi_satuan}</td>
                       <td>{item.jumlah_beli || '-'}</td>
                       <td>{formatRupiah(item.harga_beli)}</td>
-                      <td>{item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+                      <td>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                       <td>{formatRupiah(item.harga_beli_pcs)}</td>
                       <td>{item.persen_untungk}%</td>
                       <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
@@ -362,6 +362,15 @@ function TambahBarang() {
           </div>
         </div>
       </div>
+
+      {showSuccessModal && (
+        <div className="success-modal-overlay">
+          <div className="success-modal-content">
+            <div className="success-icon">✓</div>
+            <p>Berhasil ditambahkan</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

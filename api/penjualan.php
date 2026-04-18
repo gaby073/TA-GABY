@@ -5,6 +5,8 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 require_once '../config.php';
 
@@ -81,15 +83,21 @@ switch($method) {
                 $jumlah = intval($item['jumlah'] ?? 0);
                 $currentStok = intval($item['current_stok'] ?? 0);
                 
-                // Validate each item
+                // Get fresh stock from database for validation
+                $stmtCheck = $pdo->prepare("SELECT stok_total FROM barang WHERE id_barang = ?");
+                $stmtCheck->execute([$idBarang]);
+                $barangCheck = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+                $dbStok = $barangCheck ? intval($barangCheck['stok_total']) : 0;
+                
+                // Validate each item using fresh DB stock
                 if (empty($idBarang)) {
                     $errors[] = 'Item #' . ($index + 1) . ': ID barang tidak boleh kosong';
                 }
                 if ($jumlah <= 0) {
                     $errors[] = 'Item #' . ($index + 1) . ': Jumlah harus lebih dari 0';
                 }
-                if ($jumlah > $currentStok) {
-                    $errors[] = 'Item #' . ($index + 1) . ': Stok tidak mencukupi';
+                if ($jumlah > $dbStok) {
+                    $errors[] = 'Item #' . ($index + 1) . ': Stok tidak mencukupi (stok tersedia: ' . $dbStok . ')';
                 }
                 
                 $totalJumlah += $jumlah;
@@ -105,13 +113,20 @@ switch($method) {
             }
             
             foreach ($items as $item) {
-                // Update stock for each item
+                // Get current stock from database
                 $idBarang = $item['id_barang'] ?? '';
-                $currentStok = intval($item['current_stok'] ?? 0);
                 $jumlah = intval($item['jumlah'] ?? 0);
-                $newStok = $currentStok - $jumlah;
-                if ($newStok < 0) $newStok = 0;
                 
+                // Get current stock direct from database every time
+                $stmtGet = $pdo->prepare("SELECT stok_total FROM barang WHERE id_barang = ?");
+                $stmtGet->execute([$idBarang]);
+                $barangData = $stmtGet->fetch(PDO::FETCH_ASSOC);
+                $currentStok = $barangData ? intval($barangData['stok_total']) : 0;
+                
+                // Calculate new stock - only reduce if stock > 0
+                $newStok = max(0, $currentStok - $jumlah);
+                
+                // Update stock in database
                 $stmt2 = $pdo->prepare("UPDATE barang SET stok_total = ? WHERE id_barang = ?");
                 $stmt2->execute([$newStok, $idBarang]);
             }
@@ -125,9 +140,20 @@ switch($method) {
             $negativeJumlah = -$totalJumlah;
             
             try {
-                // Insert combined transaction into history_penjualan
-                $stmt3 = $pdo->prepare("INSERT INTO history_penjualan (id_barang, nama_barang, jumlah, harga_jual, total_harga, keuntungan) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt3->execute([0, $namaBarang, $negativeJumlah, 0, $totalHarga, $totalKeuntungan]);
+                // Insert each item separately into history_penjualan
+                foreach ($items as $item) {
+                    $itemNamaBarang = ($item['nama_barang'] ?? '') . ': ' . ($item['jumlah'] ?? 0) . ' pcs';
+                    $negativeJumlah = -intval($item['jumlah'] ?? 0);
+                    $stmt3 = $pdo->prepare("INSERT INTO history_penjualan (id_barang, nama_barang, jumlah, harga_jual, total_harga, keuntungan) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt3->execute([
+                        $item['id_barang'] ?? '',
+                        $item['nama_barang'] ?? '',
+                        $negativeJumlah,
+                        $item['harga_jual'] ?? 0,
+                        $item['total'] ?? $item['total_harga'] ?? 0,
+                        $item['keuntungan'] ?? 0
+                    ]);
+                }
                 
                 // Also insert each item into penjualan table
                 foreach ($items as $item) {
@@ -156,7 +182,12 @@ switch($method) {
             $jumlah = intval($data['jumlah'] ?? 0);
             $total_harga = floatval($data['total_harga'] ?? ($data['total'] ?? 0));
             $keuntungan = floatval($data['keuntungan'] ?? 0);
-            $currentStok = intval($data['current_stok'] ?? 0);
+            
+            // Get current stock from database
+            $stmtGet = $pdo->prepare("SELECT stok_total FROM barang WHERE id_barang = ?");
+            $stmtGet->execute([$id_barang]);
+            $barangData = $stmtGet->fetch(PDO::FETCH_ASSOC);
+            $currentStok = $barangData ? intval($barangData['stok_total']) : 0;
             
             // Validate
             $errors = [];
@@ -166,8 +197,8 @@ switch($method) {
             if ($jumlah <= 0) {
                 $errors[] = 'Jumlah harus lebih dari 0';
             }
-            if ($jumlah > $currentStok) {
-                $errors[] = 'Stok tidak mencukupi';
+            if ($currentStok > 0 && $jumlah > $currentStok) {
+                $errors[] = 'Stok tidak mencukupi (stok tersedia: ' . $currentStok . ')';
             }
             if ($total_harga < 0) {
                 $errors[] = 'Total harga tidak boleh negatif';

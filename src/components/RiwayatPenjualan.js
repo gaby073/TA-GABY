@@ -14,7 +14,7 @@ const RiwayatPenjualan = () => {
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8000/api/history_penjualan.php');
+      const response = await axios.get('/api/history_penjualan.php');
       setHistoryData(response.data);
       setLoading(false);
     } catch (err) {

@@ -15,7 +15,7 @@ function Login() {
     setErrorMessage('');
     
     try {
-      const response = await axios.post('http://localhost/TA-GABY/api/login.php', {
+      const response = await axios.post('/api/login.php', {
         username: username,
         password: password
       });

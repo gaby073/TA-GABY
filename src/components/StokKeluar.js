@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import './TambahBarang.css';
 
 function StokKeluar() {
@@ -119,6 +122,41 @@ const processedData = sortedHistory.map((item, index) => {
 
   const userParsed = userData ? JSON.parse(userData) : null;
 
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.text('Riwayat Stok Keluar - Berty Shop', 14, 16);
+    autoTable(doc, {
+      startY: 20,
+      head: [['No', 'Tanggal', 'ID', 'Nama Barang', 'Stok Awal', 'Stok Keluar', 'Stok Total']],
+      body: stokKeluarData.map((item, index) => [
+        index + 1,
+        item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-',
+        item.id_barang_display || '-',
+        item.nama_barang,
+        Math.max(0, parseInt(item.stok_awal) || 0),
+        parseInt(item.stok_keluar) || 0,
+        Math.max(0, parseInt(item.stok_total) || 0)
+      ]),
+    });
+    doc.save('stok-keluar.pdf');
+  };
+
+  const exportExcel = () => {
+    const data = stokKeluarData.map((item, index) => ({
+      No: index + 1,
+      Tanggal: item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-',
+      ID: item.id_barang_display || '-',
+      'Nama Barang': item.nama_barang,
+      'Stok Awal': Math.max(0, parseInt(item.stok_awal) || 0),
+      'Stok Keluar': parseInt(item.stok_keluar) || 0,
+      'Stok Total': Math.max(0, parseInt(item.stok_total) || 0)
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stok Keluar');
+    XLSX.writeFile(wb, 'stok-keluar.xlsx');
+  };
+
   return (
     <div className="tambah-page">
       <div className="kasir-header">
@@ -135,7 +173,13 @@ const processedData = sortedHistory.map((item, index) => {
         <button className="btn-back" onClick={() => navigate('/admin-dashboard')}>← Kembali ke Dashboard</button>
 
         <div className="table-card">
-          <h3>RIWAYAT STOK KELUAR ({stokKeluarData.length})</h3>
+          <div className="table-header">
+            <h3>RIWAYAT STOK KELUAR ({stokKeluarData.length})</h3>
+            <div className="export-buttons">
+              <button className="btn-export" onClick={exportPDF}>Export PDF</button>
+              <button className="btn-export" onClick={exportExcel}>Export Excel</button>
+            </div>
+          </div>
           {loading ? (
             <p>Loading...</p>
           ) : (

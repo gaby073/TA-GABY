@@ -674,3 +674,76 @@
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Chart */
+.chart-wrapper {
+  position: relative;
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-wrapper canvas {
+  max-height: 300px !important;
+}
+
+.no-data {
+  color: #aaa;
+  font-size: 15px;
+  text-align: center;
+}
+
+/* Charts berdampingan */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-half {
+  margin-bottom: 0 !important;
+}
+
+.chart-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-select {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  background: white;
+  color: #333;
+}
+
+.chart-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+@media (max-width: 900px) {
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Chart produk terlaris horizontal - lebih tinggi untuk 10 item */
+.chart-wrapper-produk {
+  position: relative;
+  height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-wrapper-produk canvas {
+  max-height: 380px !important;
+}

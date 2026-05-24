@@ -20,11 +20,103 @@ switch($method) {
         $stats = $_GET['stats'] ?? false;
         
         if ($stats) {
-            // Get sales statistics per product
-            $stmt = $pdo->query("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC");
+            // Get sales statistics per product with period filter
+            $period = $_GET['period'] ?? 'all';
+            $month = intval($_GET['month'] ?? date('n'));
+            $year = intval($_GET['year'] ?? date('Y'));
+            if ($period === 'week') {
+                $stmt = $pdo->prepare("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan WHERE MONTH(waktu) = ? AND YEAR(waktu) = ? GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC LIMIT 10");
+                $stmt->execute([$month, $year]);
+                $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode($data);
+                break;
+            } elseif ($period === 'month') {
+                $stmt = $pdo->prepare("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan WHERE MONTH(waktu) = ? AND YEAR(waktu) = ? GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC LIMIT 10");
+                $stmt->execute([$month, $year]);
+                $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode($data);
+                break;
+            } else {
+                $stmt = $pdo->query("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC LIMIT 10");
+            }
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode($data);
             break;
+        }
+        
+        if ($filter === 'chart_data') {
+            // Get chart data for sales/profit over time
+            $period = $_GET['period'] ?? 'week';
+            $month = intval($_GET['month'] ?? date('n'));
+            $year = intval($_GET['year'] ?? date('Y'));
+            
+            if ($period === 'month') {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        CONCAT('Minggu ', FLOOR((DAY(waktu)-1)/7)+1) as label,
+                        SUM(total_harga) as total_penjualan,
+                        SUM(keuntungan) as total_keuntungan
+                    FROM penjualan 
+                    WHERE MONTH(waktu) = ? AND YEAR(waktu) = ?
+                    GROUP BY FLOOR((DAY(waktu)-1)/7)
+                    ORDER BY MIN(waktu)
+                ");
+                $stmt->execute([$month, $year]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                // Fill missing days - get all days in month
+                $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+                $dataByDay = [];
+                foreach ($rows as $row) {
+                    $dataByDay[$row['label']] = $row;
+                }
+                $result = [];
+                for ($d = 1; $d <= $daysInMonth; $d++) {
+                    $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                    $label = $dateStr;
+                    $result[] = [
+                        'label' => $label,
+                        'total_penjualan' => isset($dataByDay[$label]) ? $dataByDay[$label]['total_penjualan'] : 0,
+                        'total_keuntungan' => isset($dataByDay[$label]) ? $dataByDay[$label]['total_keuntungan'] : 0,
+                    ];
+                }
+                echo json_encode($result);
+                break;
+            } else {
+                // Per minggu: Minggu 1-4 (atau 5) dalam bulan & tahun yang dipilih
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        FLOOR((DAY(waktu)-1)/7)+1 as minggu_ke,
+                        SUM(total_harga) as total_penjualan,
+                        SUM(keuntungan) as total_keuntungan
+                    FROM penjualan 
+                    WHERE MONTH(waktu) = ? AND YEAR(waktu) = ?
+                    GROUP BY minggu_ke
+                    ORDER BY minggu_ke
+                ");
+                $stmt->execute([$month, $year]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Hitung jumlah minggu nyata dalam bulan ini
+                $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+                $totalMinggu = ceil($daysInMonth / 7);
+
+                // Index by minggu_ke
+                $dataByWeek = [];
+                foreach ($rows as $row) {
+                    $dataByWeek[intval($row['minggu_ke'])] = $row;
+                }
+
+                $result = [];
+                for ($w = 1; $w <= $totalMinggu; $w++) {
+                    $result[] = [
+                        'label' => 'Minggu ' . $w,
+                        'total_penjualan' => isset($dataByWeek[$w]) ? floatval($dataByWeek[$w]['total_penjualan']) : 0,
+                        'total_keuntungan' => isset($dataByWeek[$w]) ? floatval($dataByWeek[$w]['total_keuntungan']) : 0,
+                    ];
+                }
+                echo json_encode($result);
+                break;
+            }
         }
         
         if ($filter === 'custom') {
@@ -32,6 +124,23 @@ switch($method) {
             $startDate = $_GET['start_date'] ?? date('Y-m-d', strtotime('-14 days'));
             $endDate = $_GET['end_date'] ?? date('Y-m-d');
             $stmt = $pdo->prepare("SELECT id_barang, nama_barang, SUM(jumlah) as jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as keuntungan FROM penjualan WHERE DATE(waktu) BETWEEN ? AND ? GROUP BY id_barang, nama_barang ORDER BY jumlah DESC");
+            $stmt->execute([$startDate, $endDate]);
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode($data);
+            break;
+        }
+
+        if ($filter === 'weekly') {
+            $week = intval($_GET['week'] ?? 1);
+            $month = intval($_GET['month'] ?? date('n'));
+            $year = intval($_GET['year'] ?? date('Y'));
+            $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+            $week = max(1, min($week, ceil($daysInMonth / 7)));
+            $startDay = ($week - 1) * 7 + 1;
+            $endDay = min($week * 7, $daysInMonth);
+            $startDate = sprintf('%04d-%02d-%02d', $year, $month, $startDay);
+            $endDate = sprintf('%04d-%02d-%02d', $year, $month, $endDay);
+            $stmt = $pdo->prepare("SELECT waktu, SUM(jumlah) as total_jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as total_keuntungan, GROUP_CONCAT(nama_barang SEPARATOR ', ') as nama_barang_list FROM penjualan WHERE DATE(waktu) BETWEEN ? AND ? GROUP BY waktu ORDER BY waktu DESC, id_penjualan DESC");
             $stmt->execute([$startDate, $endDate]);
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode($data);

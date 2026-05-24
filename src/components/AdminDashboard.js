@@ -22,16 +22,13 @@ function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      // Fetch barang
       const barangResponse = await axios.get('/api/barang.php?_t=' + Date.now());
       const barangData = Array.isArray(barangResponse.data) ? barangResponse.data : [];
       setBarang(barangData);
 
-      // Fetch penjualan for stats
       const penjualanResponse = await axios.get('/api/penjualan.php?filter=all');
       const penjualanData = Array.isArray(penjualanResponse.data) ? penjualanResponse.data : [];
 
-      // Calculate totals from grouped data
       const totalPenjualan = penjualanData.reduce((sum, item) => sum + parseFloat(item.total_harga || 0), 0);
       const totalKeuntungan = penjualanData.reduce((sum, item) => sum + parseFloat(item.total_keuntungan || 0), 0);
 

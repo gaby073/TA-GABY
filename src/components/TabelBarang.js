@@ -21,6 +21,10 @@ function TabelBarang() {
     harga_jual: 0
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmItem, setConfirmItem] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -34,7 +38,7 @@ function TabelBarang() {
 
   const fetchBarang = async () => {
     try {
-      const response = await axios.get('/api/barang.php');
+      const response = await axios.get('/api/barang.php?_t=' + Date.now());
       const data = response.data;
       if (Array.isArray(data)) {
         setBarang(data);
@@ -48,8 +52,17 @@ function TabelBarang() {
   };
 
   const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutYes = () => {
+    setShowLogoutModal(false);
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const handleLogoutNo = () => {
+    setShowLogoutModal(false);
   };
 
   const handleInputChange = (e) => {
@@ -87,20 +100,37 @@ function TabelBarang() {
   };
 
   const handleEdit = (item) => {
-    // Save item to localStorage for edit mode
-    localStorage.setItem('editItem', JSON.stringify(item));
+    setConfirmAction('edit');
+    setConfirmItem(item);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmEdit = () => {
+    setShowConfirmModal(false);
+    localStorage.setItem('editItem', JSON.stringify(confirmItem));
     navigate('/tambah-barangan');
   };
 
-  const handleDelete = async (id_barang) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus barang ini?')) {
-      try {
-        await axios.delete(`/api/barang.php?id_barang=${id_barang}`);
-        fetchBarang();
-      } catch (error) {
-        console.error('Error deleting barang:', error);
-      }
+  const handleDelete = (item) => {
+    setConfirmAction('delete');
+    setConfirmItem(item);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setShowConfirmModal(false);
+    try {
+      await axios.delete(`/api/barang.php?id_barang=${confirmItem.id_barang}`);
+      fetchBarang();
+    } catch (error) {
+      console.error('Error deleting barang:', error);
     }
+  };
+
+  const handleConfirmNo = () => {
+    setShowConfirmModal(false);
+    setConfirmItem(null);
+    setConfirmAction(null);
   };
 
   const resetForm = () => {
@@ -138,7 +168,7 @@ function TabelBarang() {
           <li><a href="#" onClick={() => navigate('/transaksi-penjualan')}><span>Transaksi Penjualan</span></a></li>
           <li><a href="#" className="active"><span>Tabel Barang</span></a></li>
           <li><a href="#" onClick={() => navigate('/stok-masuk')}><span>Stok Masuk</span></a></li>
-          <li><a href="#"><span>Pengaturan</span></a></li>
+          <li><a href="#" onClick={() => navigate('/stok-keluar')}><span>Stok Keluar</span></a></li>
         </ul>
 
         <div className="sidebar-footer">
@@ -158,7 +188,7 @@ function TabelBarang() {
         </div>
 
         {/* Table */}
-        <div className="content-section">
+        <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -187,7 +217,7 @@ function TabelBarang() {
                     <td>{item.isi_satuan}</td>
                     <td>{item.jumlah_beli || '-'}</td>
                     <td>{formatRupiah(item.harga_beli)}</td>
-                    <td>{item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+                    <td>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                     <td>{formatRupiah(item.harga_beli_pcs)}</td>
                     <td>{item.persen_untungk}%</td>
                     <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
@@ -195,7 +225,7 @@ function TabelBarang() {
                     <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : (item.tgl_input ? new Date(item.tgl_input).toLocaleDateString('id-ID') : '-')}</td>
                     <td>
                       <button className="btn btn-success" onClick={() => handleEdit(item)}>Edit</button>
-                      <button className="btn btn-danger" onClick={() => handleDelete(item.id_barang)}>Hapus</button>
+                      <button className="btn btn-danger" onClick={() => handleDelete(item)}>Hapus</button>
                     </td>
                   </tr>
                 ))
@@ -207,6 +237,42 @@ function TabelBarang() {
             </tbody>
           </table>
         </div>
+
+        {showConfirmModal && (
+          <div className="confirm-modal-overlay">
+            <div className="confirm-modal-content">
+              <h3>
+                {confirmAction === 'edit' ? 'Konfirmasi Edit Barang' : 'Konfirmasi Hapus Barang'}
+              </h3>
+              <p>
+                {confirmAction === 'edit' 
+                  ? 'Apakah Anda yakin ingin mengedit barang ini?' 
+                  : 'Apakah Anda yakin ingin menghapus barang ini?'}
+              </p>
+              <div className="confirm-modal-buttons">
+                <button className="btn-confirm-yes" onClick={confirmAction === 'edit' ? handleConfirmEdit : handleConfirmDelete}>
+                  YA
+                </button>
+                <button className="btn-confirm-no" onClick={handleConfirmNo}>
+                  TIDAK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showLogoutModal && (
+          <div className="confirm-modal-overlay">
+            <div className="confirm-modal-content">
+              <h3>Konfirmasi Logout</h3>
+              <p>Apakah Anda yakin ingin logout?</p>
+              <div className="confirm-modal-buttons">
+                <button className="btn-confirm-yes" onClick={handleLogoutYes}>YA</button>
+                <button className="btn-confirm-no" onClick={handleLogoutNo}>TIDAK</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

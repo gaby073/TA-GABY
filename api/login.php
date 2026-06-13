@@ -1,10 +1,11 @@
 <?php
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+// 1. Header untuk Keamanan & CORS
+header('Access-Control-Allow-Origin: *'); 
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Content-Type: application/json');
 
-// Handle preflight request
+// 2. Handle Preflight Request (Sangat Penting untuk Axios)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
@@ -13,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once '../config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Ambil data JSON dari Axios
     $data = json_decode(file_get_contents('php://input'), true);
     $username = $data['username'] ?? '';
     $password = $data['password'] ?? '';
@@ -27,13 +29,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
+        // Verifikasi: Gunakan password_verify jika di DB sudah di-hash
+        // Atau pakai ($password === $user['password']) HANYA jika masih plain text di DB
         if ($user && password_verify($password, $user['password'])) {
+            
+            // Tentukan redirect berdasarkan role
             $redirect = '/dashboard';
             if ($user['role'] === 'admin') {
                 $redirect = '/admin-dashboard';
             } elseif ($user['role'] === 'owner') {
                 $redirect = '/owner-dashboard';
             }
+            
             echo json_encode([
                 'success' => true, 
                 'message' => 'Login berhasil!',

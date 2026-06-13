@@ -12,6 +12,12 @@ function TransaksiPenjualan() {
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
   const [selectedHistory, setSelectedHistory] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [analysisData, setAnalysisData] = useState({ bestSellers: [], worstSellers: [] });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -28,18 +34,58 @@ function TransaksiPenjualan() {
     try {
       const response = await axios.get('/api/history_penjualan.php');
       setHistory(response.data);
+      analyzeProducts(response.data);
     } catch (error) {
       console.error('Error fetching history:', error);
     }
   };
 
+  const analyzeProducts = (data) => {
+    let items = data;
+    if (!Array.isArray(data)) {
+      items = data?.data || [];
+    }
+    
+    if (!Array.isArray(items) || items.length === 0) {
+      setAnalysisData({ bestSellers: [], worstSellers: [] });
+      return;
+    }
+    
+    const productTotals = {};
+    items.forEach(item => {
+      const key = item.nama_barang || item.id_barang;
+      if (!key) return;
+      if (!productTotals[key]) {
+        productTotals[key] = 0;
+      }
+      productTotals[key] += parseInt(item.jumlah || 0);
+    });
+    
+    const products = Object.entries(productTotals).map(([nama, total]) => ({
+      nama_barang: nama,
+      total_terjual: total
+    }));
+    
+    products.sort((a, b) => b.total_terjual - a.total_terjual);
+    
+    const bestSellers = products
+      .filter(p => p.total_terjual >= 20)
+      .slice(0, 5);
+    
+    const worstSellers = products
+      .filter(p => p.total_terjual < 20)
+      .sort((a, b) => a.total_terjual - b.total_terjual)
+      .slice(0, 5);
+    
+    setAnalysisData({ bestSellers, worstSellers });
+  };
+
   const fetchBarang = async () => {
     try {
-      const response = await axios.get('/api/barang.php');
+      const response = await axios.get('/api/barang.php?_t=' + Date.now());
       const data = response.data;
       if (Array.isArray(data)) {
-        // Filter out items with 0 stock
-        setBarang(data.filter(item => (parseInt(item.stok_total) || 0) > 0));
+        setBarang(data);
       } else {
         setBarang([]);
       }
@@ -50,8 +96,17 @@ function TransaksiPenjualan() {
   };
 
   const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutYes = () => {
+    setShowLogoutModal(false);
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const handleLogoutNo = () => {
+    setShowLogoutModal(false);
   };
 
   const filteredBarang = barang.filter(item => 
@@ -60,10 +115,18 @@ function TransaksiPenjualan() {
   );
 
   const addToCart = (item) => {
+    const itemStok = parseInt(item.stok_total) || 0;
+    
+    // Prevent adding if stock is 0
+    if (itemStok <= 0) {
+      setMessage('Stok habis! Tidak bisa menambahkan ke keranjang.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
     const existingItem = cart.find(c => c.id_barang === item.id_barang);
     
     if (existingItem) {
-      // Check if adding more would exceed stock
       const newQty = existingItem.jumlah + 1;
       if (newQty > item.stok_total) {
         setMessage('Stok tidak mencukupi!');
@@ -137,26 +200,51 @@ function TransaksiPenjualan() {
     return { totalBayar, totalKeuntungan };
   };
 
-  const handleSaveTransaction = async () => {
+  const handleSaveTransaction = () => {
     if (cart.length === 0) {
       setMessage('Keranjang kosong!');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
 
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmYes = async () => {
+    setShowConfirmModal(false);
+    
+    // Check if any item has 0 stock before saving
+    const barang = await axios.get('/api/barang.php?_t=' + Date.now()).then(res => res.data);
+    
+    for (const cartItem of cart) {
+      const barangItem = barang.find(b => b.id_barang === cartItem.id_barang);
+      const currentStok = barangItem ? parseInt(barangItem.stok_total) || 0 : 0;
+      
+      if (currentStok <= 0) {
+        setMessage('Stok ' + cartItem.nama_barang + ' habis! Tidak bisa menyimpan transaksi.');
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
+    }
+    
     try {
-      // Send all cart items as one transaction
       await axios.post('/api/penjualan.php', { items: cart });
       
       setMessage('Transaksi berhasil disimpan!');
       setCart([]);
-      fetchBarang(); // Refresh stock
-      fetchHistory(); // Refresh history
+      fetchBarang();
+      fetchHistory();
+      setShowSuccessModal(true);
+      setTimeout(() => setShowSuccessModal(false), 1500);
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('Gagal menyimpan transaksi: ' + error.message);
       setTimeout(() => setMessage(''), 3000);
     }
+  };
+
+  const handleConfirmNo = () => {
+    setShowConfirmModal(false);
   };
 
   const formatRupiah = (angka) => {
@@ -253,6 +341,7 @@ function TransaksiPenjualan() {
           <li><a href="#" onClick={() => navigate('/transaksi-penjualan')} className="active"><span>Transaksi Penjualan</span></a></li>
           <li><a href="#" onClick={() => navigate('/tabel-barang')}><span>Tabel Barang</span></a></li>
           <li><a href="#" onClick={() => navigate('/stok-masuk')}><span>Stok Masuk</span></a></li>
+          <li><a href="#" onClick={() => navigate('/stok-keluar')}><span>Stok Keluar</span></a></li>
         </ul>
 
         <div className="sidebar-footer">
@@ -266,11 +355,82 @@ function TransaksiPenjualan() {
       <div className="admin-main-content">
         <div className="page-header">
           <h1>Transaksi Penjualan</h1>
+          <button 
+            className={`btn ${showAnalysis ? 'btn-secondary' : 'btn-primary'}`}
+            onClick={() => {
+              if (!showAnalysis && history.length > 0) {
+                analyzeProducts(history);
+              }
+              setShowAnalysis(!showAnalysis);
+            }}
+            style={{ marginLeft: '10px' }}
+          >
+            {showAnalysis ? 'Tutup Analisis' : 'Analisis Produk'}
+          </button>
         </div>
 
         {message && (
           <div className={`alert ${message.includes('berhasil') ? 'alert-success' : 'alert-error'}`}>
             {message}
+          </div>
+        )}
+
+        {showAnalysis && (
+          <div className="analysis-section" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+            <h3 style={{ marginBottom: '15px', color: '#333' }}>Analisis Penjualan Produk</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ backgroundColor: '#d4edda', padding: '15px', borderRadius: '8px' }}>
+                <h4 style={{ color: '#155724', marginBottom: '10px' }}>Produk Paling Laris (>=20)</h4>
+                {analysisData.bestSellers.length > 0 ? (
+                  <table className="data-table" style={{ backgroundColor: 'white' }}>
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Nama Produk</th>
+                        <th>Terjual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analysisData.bestSellers.map((item, index) => (
+                        <tr key={item.id_barang}>
+                          <td style={{ fontWeight: 'bold' }}>#{index + 1}</td>
+                          <td>{item.nama_barang}</td>
+                          <td style={{ fontWeight: 'bold', color: '#155724' }}>{item.total_terjual}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ color: '#155724' }}>Tidak ada produk dengan penjualan >= 20</p>
+                )}
+              </div>
+
+              <div style={{ backgroundColor: '#f8d7da', padding: '15px', borderRadius: '8px' }}>
+                <h4 style={{ color: '#721c24', marginBottom: '10px' }}>Produk Jarang Laku (&lt;20)</h4>
+                {analysisData.worstSellers.length > 0 ? (
+                  <table className="data-table" style={{ backgroundColor: 'white' }}>
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Nama Produk</th>
+                        <th>Terjual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analysisData.worstSellers.map((item, index) => (
+                        <tr key={item.id_barang}>
+                          <td style={{ fontWeight: 'bold' }}>#{index + 1}</td>
+                          <td>{item.nama_barang}</td>
+                          <td style={{ fontWeight: 'bold', color: '#721c24' }}>{item.total_terjual}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ color: '#721c24' }}>Tidak ada produk dengan penjualan &lt; 20</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -446,6 +606,41 @@ function TransaksiPenjualan() {
               <p><strong>Barang yang dibeli:</strong></p>
               <p style={{marginLeft: '15px'}}>{selectedHistory.nama_barang}</p>
               <button className="btn btn-danger" onClick={() => setSelectedHistory(null)}>Tutup</button>
+            </div>
+          </div>
+        )}
+
+        {showSuccessModal && (
+          <div className="success-modal-overlay">
+            <div className="success-modal-content">
+              <div className="success-icon">✓</div>
+              <p>{successMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {showConfirmModal && (
+          <div className="confirm-modal-overlay">
+            <div className="confirm-modal-content">
+              <h3>Konfirmasi Simpan Transaksi</h3>
+              <p>Apakah Anda yakin ingin menyimpan transaksi ini?</p>
+              <div className="confirm-modal-buttons">
+                <button className="btn-confirm-yes" onClick={handleConfirmYes}>YA</button>
+                <button className="btn-confirm-no" onClick={handleConfirmNo}>TIDAK</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showLogoutModal && (
+          <div className="confirm-modal-overlay">
+            <div className="confirm-modal-content">
+              <h3>Konfirmasi Logout</h3>
+              <p>Apakah Anda yakin ingin logout?</p>
+              <div className="confirm-modal-buttons">
+                <button className="btn-confirm-yes" onClick={handleLogoutYes}>YA</button>
+                <button className="btn-confirm-no" onClick={handleLogoutNo}>TIDAK</button>
+              </div>
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@ import AdminDashboard from './components/AdminDashboard';
 import TabelBarang from './components/TabelBarang';
 import TambahBarang from './components/TambahBarang';
 import StokMasuk from './components/StokMasuk';
+import StokKeluar from './components/StokKeluar';
 import TransaksiPenjualan from './components/TransaksiPenjualan';
 import RiwayatPenjualan from './components/RiwayatPenjualan';
 import OwnerDashboard from './components/owner/OwnerDashboard';
@@ -22,6 +23,7 @@ function App() {
         <Route path="/tambah-barang" element={<TambahBarang />} />
         <Route path="/tambah-barangan" element={<TambahBarang />} />
         <Route path="/stok-masuk" element={<StokMasuk />} />
+        <Route path="/stok-keluar" element={<StokKeluar />} />
         <Route path="/transaksi-penjualan" element={<TransaksiPenjualan />} />
         <Route path="/riwayat-penjualan" element={<RiwayatPenjualan />} />
         <Route path="/owner-dashboard" element={<OwnerDashboard />} />

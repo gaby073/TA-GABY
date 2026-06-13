@@ -6,10 +6,13 @@ import './Login.css';
 function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     
     try {
       const response = await axios.post('/api/login.php', {
@@ -19,15 +22,19 @@ function Login() {
       
       if (response.data.success) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        alert(response.data.message);
-        // Redirect based on role
-        const redirectUrl = response.data.redirect || '/dashboard';
-        navigate(redirectUrl);
+        setShowSuccessModal(true);
+        setTimeout(() => {
+          setShowSuccessModal(false);
+          const redirectUrl = response.data.redirect || '/dashboard';
+          navigate(redirectUrl);
+        }, 1500);
       } else {
-        alert(response.data.message);
+        setErrorMessage(response.data.message);
       }
     } catch (error) {
-      alert('Terjadi kesalahan: ' + (error.response?.data?.message || error.message));
+      console.error('Login error:', error);
+      const errMsg = error.response?.data?.message || error.message || 'Unknown error';
+      setErrorMessage(errMsg);
     }
   };
 
@@ -55,8 +62,18 @@ function Login() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {errorMessage && <div className="error-message">{errorMessage}</div>}
           <button type="submit" className="login-btn">LOGIN</button>
         </form>
+
+        {showSuccessModal && (
+          <div className="success-modal-overlay">
+            <div className="success-modal-content">
+              <div className="success-icon">✓</div>
+              <p>Berhasil Login</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

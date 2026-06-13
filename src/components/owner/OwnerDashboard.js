@@ -1,7 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../utils/api';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, Title, Tooltip, Legend
+} from 'chart.js';
+import { Line, Bar } from 'react-chartjs-2';
 import './OwnerDashboard.css';
+
+const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const YEARS = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
 function OwnerDashboard() {
   const [user, setUser] = useState(null);
@@ -12,9 +23,22 @@ function OwnerDashboard() {
     jumlahBarang: 0
   });
   const [salesStats, setSalesStats] = useState([]);
+  const now = new Date();
+  const [chartFilter, setChartFilter] = useState('week');
+  const [chartMonth, setChartMonth] = useState(now.getMonth() + 1);
+  const [chartYear, setChartYear] = useState(now.getFullYear());
+  const [produkFilter, setProdukFilter] = useState('week');
+  const [produkMonth, setProdukMonth] = useState(now.getMonth() + 1);
+  const [produkYear, setProdukYear] = useState(now.getFullYear());
+  const [chartData, setChartData] = useState([]);
+  const [produkData, setProdukData] = useState([]);
+  const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const YEARS = Array.from({length: 5}, (_, i) => now.getFullYear() - i);
+
   const [activeMenu, setActiveMenu] = useState(() => {
     return localStorage.getItem('ownerActiveMenu') || 'dashboard';
   });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const navigate = useNavigate();
 
   const formatRupiah = (angka) => {
@@ -33,7 +57,7 @@ function OwnerDashboard() {
       item.persen_untungk,
       item.harga_jual - item.harga_beli_pcs,
       item.harga_jual,
-      item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'
+      item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'
     ]);
     
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -57,7 +81,7 @@ function OwnerDashboard() {
         <td>${item.persen_untungk}%</td>
         <td>${formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
         <td>${formatRupiah(item.harga_jual)}</td>
-        <td>${item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+        <td>${item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
       </tr>
     `).join('');
     
@@ -110,30 +134,32 @@ function OwnerDashboard() {
     setActiveMenu(menu);
   };
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      navigate('/login');
-    } else {
-      const parsedUser = JSON.parse(userData);
-      if (parsedUser.role !== 'owner') {
-        navigate('/login');
-      } else {
-        setUser(parsedUser);
-        fetchData();
-      }
-    }
-  }, [navigate]);
+  const fetchChartData = useCallback(async (period, month, year) => {
+    try {
+      const res = await api.get(`/penjualan.php?filter=chart_data&period=${period}&month=${month}&year=${year}&_t=${Date.now()}`);
+      setChartData(Array.isArray(res.data) ? res.data : []);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  const fetchProdukData = useCallback(async (period, month, year) => {
+    try {
+      const res = await api.get(`/penjualan.php?stats=1&period=${period}&month=${month}&year=${year}&_t=${Date.now()}`);
+      setProdukData(Array.isArray(res.data) ? res.data : []);
+    } catch (e) { console.error(e); }
+  }, []);
 
   const fetchData = async () => {
     try {
-      // Fetch barang
-      const barangResponse = await axios.get('/api/barang.php');
+      // Force refresh from server
+      const barangResponse = await api.get('/barang.php', { 
+        headers: { 'Pragma': 'no-cache' },
+        params: { _t: Date.now(), _r: Math.random() } 
+      });
       const barangData = Array.isArray(barangResponse.data) ? barangResponse.data : [];
       setBarang(barangData);
 
       // Fetch penjualan for stats
-      const penjualanResponse = await axios.get('/api/penjualan.php?filter=all');
+      const penjualanResponse = await api.get('/penjualan.php?filter=all');
       const penjualanData = Array.isArray(penjualanResponse.data) ? penjualanResponse.data : [];
 
       // Calculate stats
@@ -147,7 +173,7 @@ function OwnerDashboard() {
       });
 
       // Fetch sales statistics per product
-      const salesStatsResponse = await axios.get('/api/penjualan.php?stats=true');
+      const salesStatsResponse = await api.get('/penjualan.php?stats=true');
       const salesStatsData = Array.isArray(salesStatsResponse.data) ? salesStatsResponse.data : [];
       setSalesStats(salesStatsData);
     } catch (error) {
@@ -155,9 +181,47 @@ function OwnerDashboard() {
     }
   };
 
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      navigate('/login');
+    } else {
+      const parsedUser = JSON.parse(userData);
+      if (parsedUser.role !== 'owner') {
+        navigate('/login');
+      } else {
+        setUser(parsedUser);
+        fetchData();
+        fetchChartData('week', now.getMonth() + 1, now.getFullYear());
+        fetchProdukData('month', now.getMonth() + 1, now.getFullYear());
+      }
+    }
+  }, [navigate, fetchChartData, fetchProdukData]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+      fetchChartData(chartFilter, chartMonth, chartYear);
+      fetchProdukData('month', produkMonth, produkYear);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchChartData, fetchProdukData, chartFilter, produkFilter]);
+
+  useEffect(() => { fetchChartData(chartFilter, chartMonth, chartYear); }, [chartFilter, chartMonth, chartYear, fetchChartData]);
+  useEffect(() => { fetchProdukData('month', produkMonth, produkYear); }, [produkMonth, produkYear, fetchProdukData]);
+
   const handleLogout = () => {
+    setShowConfirmModal(true);
+  };
+
+  const handleLogoutYes = () => {
+    setShowConfirmModal(false);
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const handleLogoutNo = () => {
+    setShowConfirmModal(false);
   };
 
   const renderContent = () => {
@@ -191,6 +255,76 @@ function OwnerDashboard() {
                 <div className="stat-info">
                   <h3>{stats.jumlahBarang}</h3>
                   <p>Jumlah Barang</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Charts berdampingan */}
+            <div className="charts-row">
+              {/* Chart Penjualan & Keuntungan */}
+              <div className="content-section chart-half">
+                <div className="section-header">
+                  <h2><i className="fas fa-chart-line"></i> Penjualan &amp; Keuntungan</h2>
+                </div>
+                <div className="chart-filter-bar">
+                  <button className={`filter-btn ${chartFilter === 'week' ? 'active' : ''}`} onClick={() => setChartFilter('week')}>Per Minggu</button>
+                  <select className="chart-select" value={chartMonth} onChange={e => setChartMonth(Number(e.target.value))}>
+                    {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+                  </select>
+                  <select className="chart-select" value={chartYear} onChange={e => setChartYear(Number(e.target.value))}>
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div className="chart-wrapper">
+                  {chartData.length > 0 ? (
+                    <Line
+                      data={{ labels: chartData.map(d => d.label), datasets: [
+                        { label: 'Penjualan', data: chartData.map(d => parseFloat(d.total_penjualan || 0)), borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', tension: 0.4, fill: true },
+                        { label: 'Keuntungan', data: chartData.map(d => parseFloat(d.total_keuntungan || 0)), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,0.1)', tension: 0.4, fill: true }
+                      ]}}
+                      options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: ctx => formatRupiah(ctx.raw) } } }, scales: { y: { ticks: { callback: val => 'Rp ' + (val/1000).toFixed(0) + 'k' } } } }}
+                    />
+                  ) : <p className="no-data">Belum ada data</p>}
+                </div>
+              </div>
+
+              {/* Chart Produk Terlaris */}
+              <div className="content-section chart-half">
+                <div className="section-header">
+                  <h2><i className="fas fa-chart-bar"></i> 10 Produk Terlaris</h2>
+                </div>
+                <div className="chart-filter-bar">
+                  <select className="chart-select" value={produkMonth} onChange={e => setProdukMonth(Number(e.target.value))}>
+                    {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+                  </select>
+                  <select className="chart-select" value={produkYear} onChange={e => setProdukYear(Number(e.target.value))}>
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div className="chart-wrapper-produk">
+                  {produkData.length > 0 ? (
+                    <Bar
+                      data={{ labels: produkData.slice(0,10).map(d => d.nama_barang), datasets: [{
+                        label: 'Terjual (pcs)',
+                        data: produkData.slice(0,10).map(d => parseInt(d.total_terjual || 0)),
+                        backgroundColor: ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c','#e91e63','#34495e','#16a085'],
+                        borderRadius: 4,
+                      }]}}
+                      options={{
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: { callbacks: { afterLabel: ctx => 'Penjualan: ' + formatRupiah(produkData[ctx.dataIndex].total_penjualan) } }
+                        },
+                        scales: {
+                          x: { beginAtZero: true, ticks: { stepSize: 1 } },
+                          y: { ticks: { font: { size: 11 } } }
+                        }
+                      }}
+                    />
+                  ) : <p className="no-data">Belum ada data</p>}
                 </div>
               </div>
             </div>
@@ -236,7 +370,7 @@ function OwnerDashboard() {
                         <td>{item.persen_untungk}%</td>
                         <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
                         <td>{formatRupiah(item.harga_jual)}</td>
-                        <td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+<td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                       </tr>
                     ))
                   ) : (
@@ -305,6 +439,19 @@ function OwnerDashboard() {
       <div className="owner-main-content">
         {renderContent()}
       </div>
+
+      {showConfirmModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal-content">
+            <h3>Konfirmasi Logout</h3>
+            <p>Apakah Anda yakin ingin logout?</p>
+            <div className="confirm-modal-buttons">
+              <button className="btn-confirm-yes" onClick={handleLogoutYes}>YA</button>
+              <button className="btn-confirm-no" onClick={handleLogoutNo}>TIDAK</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -314,17 +461,35 @@ function LaporanKeuntungan() {
   const [transactions, setTransactions] = useState([]);
   const [filter, setFilter] = useState('daily');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [week, setWeek] = useState(Math.floor((new Date().getDate() - 1) / 7) + 1);
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [year, setYear] = useState(new Date().getFullYear());
   const [totals, setTotals] = useState({ totalPenjualan: 0, totalKeuntungan: 0, totalItems: 0 });
   const [recapData, setRecapData] = useState([]);
   const [showRecap, setShowRecap] = useState(false);
+  const weeksInMonth = Math.ceil(new Date(year, month, 0).getDate() / 7);
+
+  useEffect(() => {
+    if (week > weeksInMonth) {
+      setWeek(weeksInMonth);
+    }
+  }, [month, year, week, weeksInMonth]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [filter, date]);
+  }, [filter, date, month, year, week]);
 
   const fetchTransactions = async () => {
     try {
-      const response = await axios.get(`/api/penjualan.php?filter=${filter}&date=${date}`);
+      let url = `/penjualan.php?filter=${filter}`;
+      if (filter === 'daily') {
+        url += `&date=${date}`;
+      } else if (filter === 'weekly') {
+        url += `&month=${month}&year=${year}&week=${week}`;
+      } else if (filter === 'monthly') {
+        url += `&date=${date}`;
+      }
+      const response = await api.get(url);
       const data = response.data;
       if (Array.isArray(data)) {
         setTransactions(data);
@@ -336,8 +501,8 @@ function LaporanKeuntungan() {
         setTotals({ totalPenjualan, totalKeuntungan, totalItems });
         
         // Create recap data
-        if (filter === 'daily') {
-          // Group by date for daily view
+        if (filter === 'daily' || filter === 'weekly') {
+          // Group by date for daily or weekly view
           const grouped = {};
           data.forEach(item => {
             const day = item.waktu ? new Date(item.waktu).toLocaleDateString('id-ID') : 'Unknown';
@@ -353,13 +518,13 @@ function LaporanKeuntungan() {
           // Group by month for monthly view
           const grouped = {};
           data.forEach(item => {
-            const month = item.waktu ? new Date(item.waktu).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' }) : 'Unknown';
-            if (!grouped[month]) {
-              grouped[month] = { tanggal: month, totalPenjualan: 0, totalKeuntungan: 0, jumlahTransaksi: 0 };
+            const monthLabel = item.waktu ? new Date(item.waktu).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' }) : 'Unknown';
+            if (!grouped[monthLabel]) {
+              grouped[monthLabel] = { tanggal: monthLabel, totalPenjualan: 0, totalKeuntungan: 0, jumlahTransaksi: 0 };
             }
-            grouped[month].totalPenjualan += parseFloat(item.total_harga || 0);
-            grouped[month].totalKeuntungan += parseFloat(item.total_keuntungan || 0);
-            grouped[month].jumlahTransaksi += 1;
+            grouped[monthLabel].totalPenjualan += parseFloat(item.total_harga || 0);
+            grouped[monthLabel].totalKeuntungan += parseFloat(item.total_keuntungan || 0);
+            grouped[monthLabel].jumlahTransaksi += 1;
           });
           setRecapData(Object.values(grouped));
         }
@@ -378,6 +543,85 @@ function LaporanKeuntungan() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
 
+  const exportToExcel = (data, isRecap = false) => {
+    const headers = isRecap 
+      ? ['No', filter === 'daily' || filter === 'weekly' ? 'Tanggal' : 'Bulan', 'Jumlah Transaksi', 'Total Penjualan', 'Total Keuntungan']
+      : ['No', 'Tanggal', 'Nama Barang', 'Jumlah Beli', 'Total Harga Jual', 'Total Keuntungan'];
+    const rows = data.map((item, index) => isRecap 
+      ? [index + 1, item.tanggal, item.jumlahTransaksi, item.totalPenjualan, item.totalKeuntungan]
+      : [index + 1, item.waktu ? new Date(item.waktu).toLocaleString('id-ID') : '-', item.nama_barang_list || '-', item.total_jumlah, item.total_harga, item.total_keuntungan]
+    );
+    
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `laporan_keuntungan_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const exportToPDF = (data, isRecap = false) => {
+    const printWindow = window.open('', '_blank');
+    const tableRows = data.map((item, index) => isRecap
+      ? `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.tanggal}</td>
+          <td>${item.jumlahTransaksi}</td>
+          <td>${formatRupiah(item.totalPenjualan)}</td>
+          <td>${formatRupiah(item.totalKeuntungan)}</td>
+        </tr>
+      `
+      : `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.waktu ? new Date(item.waktu).toLocaleString('id-ID') : '-'}</td>
+          <td>${item.nama_barang_list || '-'}</td>
+          <td>${item.total_jumlah}</td>
+          <td>${formatRupiah(item.total_harga)}</td>
+          <td style={{color: 'green'}}>${formatRupiah(item.total_keuntungan)}</td>
+        </tr>
+      `
+    ).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Laporan Keuntungan</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #667eea; color: white; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <h1>Laporan Keuntungan - Berty Shop</h1>
+        <table>
+          <thead>
+            <tr>
+              ${isRecap 
+                ? '<th>No</th><th>' + (filter === 'daily' || filter === 'weekly' ? 'Tanggal' : 'Bulan') + '</th><th>Jumlah Transaksi</th><th>Total Penjualan</th><th>Total Keuntungan</th>'
+                : '<th>No</th><th>Tanggal</th><th>Nama Barang</th><th>Jumlah Beli</th><th>Total Harga Jual</th><th>Total Keuntungan</th>'
+              }
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="owner-content">
       <div className="page-header">
@@ -394,29 +638,59 @@ function LaporanKeuntungan() {
             Harian
           </button>
           <button 
-            className={`filter-btn ${filter === 'monthly' ? 'active' : ''}`}
-            onClick={() => { setFilter('monthly'); setShowRecap(false); }}
-          >
-            Bulanan
-          </button>
-        </div>
-        
-        <div className="date-picker">
-          <label>Tanggal: </label>
-          <input 
-            type="date" 
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
+              className={`filter-btn ${filter === 'weekly' ? 'active' : ''}`}
+              onClick={() => { setFilter('weekly'); setShowRecap(false); }}
+            >
+              Mingguan
+            </button>
+            <button 
+              className={`filter-btn ${filter === 'monthly' ? 'active' : ''}`}
+              onClick={() => { setFilter('monthly'); setShowRecap(false); }}
+            >
+              Bulanan
+            </button>
+          </div>
+          
+          {filter === 'daily' && (
+            <div className="date-picker">
+              <label>Tanggal: </label>
+              <input 
+                type="date" 
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+          )}
 
-        <button 
-          className={`filter-btn ${showRecap ? 'active' : ''}`}
-          onClick={() => setShowRecap(!showRecap)}
-          style={{ marginLeft: '10px' }}
-        >
-          {showRecap ? 'Detail' : 'Rekap'}
-        </button>
+          {filter === 'weekly' && (
+            <div className="date-picker">
+              <label>Bulan: </label>
+              <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+                {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              </select>
+              <label>Tahun: </label>
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <label>Minggu: </label>
+              <select value={week} onChange={(e) => setWeek(Number(e.target.value))}>
+                {Array.from({ length: weeksInMonth }, (_, i) => i + 1).map(w => (
+                  <option key={w} value={w}>Minggu {w}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {filter === 'monthly' && (
+            <div className="date-picker">
+              <label>Tanggal: </label>
+              <input 
+                type="date" 
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+          )}
       </div>
 
       {/* Summary Cards */}
@@ -453,12 +727,22 @@ function LaporanKeuntungan() {
       {showRecap ? (
         /* Rekap Table */
         <div className="content-section">
-          <h2>Rekap {filter === 'daily' ? 'Harian' : 'Bulanan'}</h2>
+          <div className="section-header">
+            <h2>Rekap {filter === 'daily' ? 'Harian' : filter === 'weekly' ? 'Mingguan' : 'Bulanan'}</h2>
+            <div className="export-buttons">
+              <button className="btn btn-success" onClick={() => exportToExcel(recapData, true)}>
+                <i className="fas fa-file-excel"></i> Export Excel
+              </button>
+              <button className="btn btn-danger" onClick={() => exportToPDF(recapData, true)}>
+                <i className="fas fa-file-pdf"></i> Export PDF
+              </button>
+            </div>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
                 <th>No</th>
-                <th>{filter === 'daily' ? 'Tanggal' : 'Bulan'}</th>
+                <th>{filter === 'daily' || filter === 'weekly' ? 'Tanggal' : 'Bulan'}</th>
                 <th>Jumlah Transaksi</th>
                 <th>Total Penjualan</th>
                 <th>Total Keuntungan</th>
@@ -486,6 +770,17 @@ function LaporanKeuntungan() {
       ) : (
         /* Transactions Table */
         <div className="content-section">
+          <div className="section-header">
+            <h2>Detail Transaksi</h2>
+            <div className="export-buttons">
+              <button className="btn btn-success" onClick={() => exportToExcel(transactions, false)}>
+                <i className="fas fa-file-excel"></i> Export Excel
+              </button>
+              <button className="btn btn-danger" onClick={() => exportToPDF(transactions, false)}>
+                <i className="fas fa-file-pdf"></i> Export PDF
+              </button>
+            </div>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
@@ -541,7 +836,7 @@ function ManajemenUser() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/users.php');
+      const response = await api.get('/users.php');
       setUsers(response.data);
       setLoading(false);
     } catch (error) {
@@ -553,7 +848,7 @@ function ManajemenUser() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/users.php', formData);
+      const response = await api.post('/users.php', formData);
       if (response.data.success) {
         alert(response.data.message);
         setShowModal(false);
@@ -571,7 +866,8 @@ function ManajemenUser() {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      password: '',
+      currentPassword: user.password || '',
+      newPassword: '',
       role: user.role
     });
     setShowEditModal(true);
@@ -580,17 +876,18 @@ function ManajemenUser() {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.put('/api/users.php', {
+      const passwordToUpdate = formData.newPassword || formData.currentPassword;
+      const response = await api.put('/users.php', {
         id: editingUser.id,
         username: formData.username,
         role: formData.role,
-        password: formData.password
+        password: passwordToUpdate
       });
       if (response.data.success) {
         alert(response.data.message);
         setShowEditModal(false);
         setEditingUser(null);
-        setFormData({ username: '', password: '', role: 'user' });
+        setFormData({ username: '', currentPassword: '', newPassword: '', role: 'user' });
         fetchUsers();
       } else {
         alert(response.data.message);
@@ -603,7 +900,7 @@ function ManajemenUser() {
   const handleDeleteUser = async (id) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus user ini?')) {
       try {
-        const response = await axios.delete(`/api/users.php?id=${id}`);
+        const response = await api.delete(`/users.php?id=${id}`);
         if (response.data.success) {
           alert(response.data.message);
           fetchUsers();
@@ -742,11 +1039,21 @@ function ManajemenUser() {
                 />
               </div>
               <div className="form-group">
-                <label>Password (kosongkan jika tidak ingin mengubah)</label>
+                <label>Password Saat Ini</label>
                 <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  type="text"
+                  value={formData.currentPassword ? 'Password tersimpan' : 'Tidak ada password'}
+                  readOnly
+                  style={{backgroundColor: '#e9ecef', cursor: 'not-allowed', color: formData.currentPassword ? 'green' : 'red'}}
+                />
+              </div>
+              <div className="form-group">
+                <label>Ubah Password (kosongkan jika tidak ingin mengubah)</label>
+                <input
+                  type="text"
+                  value={formData.newPassword}
+                  onChange={(e) => setFormData({...formData, newPassword: e.target.value})}
+                  placeholder="Masukkan password baru"
                 />
               </div>
               <div className="form-group">
@@ -795,7 +1102,7 @@ function TabelBarangOwner({ barang, salesStats }) {
   const fetchAnalysis = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`/api/penjualan.php?filter=custom&start_date=${startDate}&end_date=${endDate}`);
+      const response = await api.get(`/penjualan.php?filter=custom&start_date=${startDate}&end_date=${endDate}`);
       const data = response.data;
       
       if (Array.isArray(data) && data.length > 0) {
@@ -980,7 +1287,7 @@ function TabelBarangOwner({ barang, salesStats }) {
                   <td>{item.persen_untungk}%</td>
                   <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
                   <td>{formatRupiah(item.harga_jual)}</td>
-                  <td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total || (item.isi_satuan * (item.jumlah_beli || 1)) || '-'}</td>
+                  <td style={{backgroundColor: '#ffb6c1', fontWeight: 'bold'}}>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                 </tr>
               ))
             ) : (

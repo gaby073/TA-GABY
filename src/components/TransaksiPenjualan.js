@@ -252,9 +252,10 @@ function TransaksiPenjualan() {
   };
 
   const exportToExcel = (data) => {
-    const headers = ['No', 'Nama Barang', 'Jumlah Terjual', 'Total Bayar', 'Keuntungan', 'Tanggal'];
+    const headers = ['No', 'ID Penjualan', 'Nama Barang', 'Jumlah Terjual', 'Total Bayar', 'Keuntungan', 'Tanggal'];
     const rows = data.slice(0, 10).map((item, index) => [
       index + 1,
+      `TRX-${item.id_history}`,
       item.nama_barang,
       item.jumlah,
       item.total_harga,
@@ -275,6 +276,7 @@ function TransaksiPenjualan() {
     const tableRows = data.slice(0, 10).map((item, index) => `
       <tr>
         <td>${index + 1}</td>
+        <td>TRX-${item.id_history}</td>
         <td>${item.nama_barang}</td>
         <td>${item.jumlah}</td>
         <td>${formatRupiah(item.total_harga)}</td>
@@ -303,6 +305,7 @@ function TransaksiPenjualan() {
           <thead>
             <tr>
               <th>No</th>
+              <th>ID Penjualan</th>
               <th>Nama Barang</th>
               <th>Jumlah Terjual</th>
               <th>Total Bayar</th>
@@ -333,6 +336,14 @@ function TransaksiPenjualan() {
       <div className="admin-sidebar">
         <div className="sidebar-header">
           <h2><i className="fas fa-store"></i> <span>Berty Shop</span></h2>
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <img 
+              src="/berty.png" 
+              alt="Berty Shop Logo" 
+              style={{ width: '100px', height: '100px', objectFit: 'contain' }} 
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
           <div className="admin-name">Admin: {user.username}</div>
         </div>
         
@@ -447,38 +458,40 @@ function TransaksiPenjualan() {
               />
             </div>
 
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nama</th>
-                  <th>Harga Beli/Pcs</th>
-                  <th>Harga Jual</th>
-                  <th>Stok Total</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBarang.length > 0 ? (
-                  filteredBarang.map((item) => (
-                    <tr key={item.id_barang}>
-                      <td>{item.id_barang}</td>
-                      <td>{item.nama_barang}</td>
-                      <td>{formatRupiah(item.harga_beli_pcs)}</td>
-                      <td>{formatRupiah(item.harga_jual)}</td>
-                      <td style={{fontWeight: 'bold', color: '#ff69b4'}}>{item.stok_total || 0}</td>
-                      <td>
-                        <button className="btn btn-primary" onClick={() => addToCart(item)}>Pilih</button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
                   <tr>
-                    <td colSpan="6" style={{textAlign: 'center'}}>Tidak ada barang</td>
+                    <th>ID</th>
+                    <th>Nama</th>
+                    <th>Harga Beli/Pcs</th>
+                    <th>Harga Jual</th>
+                    <th>Stok Total</th>
+                    <th>Aksi</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredBarang.length > 0 ? (
+                    filteredBarang.map((item) => (
+                      <tr key={item.id_barang}>
+                        <td>{item.id_barang}</td>
+                        <td>{item.nama_barang}</td>
+                        <td>{formatRupiah(item.harga_beli_pcs)}</td>
+                        <td>{formatRupiah(item.harga_jual)}</td>
+                        <td style={{fontWeight: 'bold', color: '#ff69b4'}}>{item.stok_total || 0}</td>
+                        <td>
+                          <button className="btn btn-primary" onClick={() => addToCart(item)}>Pilih</button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" style={{textAlign: 'center'}}>Tidak ada barang</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Cart Section */}
@@ -564,6 +577,7 @@ function TransaksiPenjualan() {
             <thead>
               <tr>
                 <th>No</th>
+                <th>ID Penjualan</th>
                 <th>Nama Barang</th>
                 <th>Jumlah Terjual</th>
                 <th>Total Bayar</th>
@@ -577,6 +591,7 @@ function TransaksiPenjualan() {
                 history.slice(0, 10).map((item, index) => (
                   <tr key={item.id_history}>
                     <td>{index + 1}</td>
+                    <td style={{fontWeight: 'bold'}}>TRX-{item.id_history}</td>
                     <td>{item.nama_barang}</td>
                     <td style={{color: '#dc3545', fontWeight: 'bold'}}>{item.jumlah}</td>
                     <td>{formatRupiah(item.total_harga)}</td>

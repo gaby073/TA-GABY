@@ -77,6 +77,11 @@
   min-width: 0;
 }
 
+.items-section .table-scroll {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
 .cart-section {
   width: 100%;
   max-width: 600px;

@@ -390,7 +390,12 @@ function StokMasuk() {
       </div>
 
       <div className="tambah-container">
-        <button className="btn-back" onClick={() => navigate('/tabel-barang')}>← Kembali ke Tabel</button>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+          <button className="btn-back" onClick={() => navigate('/tabel-barang')} style={{marginBottom: 0}}>← Kembali ke Tabel</button>
+          <button className="btn btn-primary" onClick={() => navigate('/struk-grosir')} style={{padding: '10px 20px', fontWeight: 'bold'}}>
+            <i className="fas fa-receipt"></i> Struk Grosir
+          </button>
+        </div>
         
         {/* Form Section */}
         <div className="form-card">

@@ -102,8 +102,8 @@ switch($method) {
         }
         
         $keterangan = $data['keterangan'] ?? '';
-        $harga_beli_pcs = $harga_beli / $isi_satuan;
         $stok_total = $isi_satuan * $jumlah_beli;
+        $harga_beli_pcs = $stok_total > 0 ? ($harga_beli / $stok_total) : 0;
         
         try {
             $stmt = $pdo->prepare("INSERT INTO barang (id_barang, nama_barang, satuan_beli, isi_satuan, jumlah_beli, harga_beli, harga_beli_pcs, persen_untungk, harga_jual, stok_total, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -208,10 +208,12 @@ switch($method) {
             
             $keterangan = $data['keterangan'] ?? '';
             $stok_total = $data['stok_total'] ?? ($isi_satuan * $jumlah_beli);
+            $total_pcs_beli = $isi_satuan * $jumlah_beli;
+            $harga_beli_pcs_calc = $total_pcs_beli > 0 ? ($harga_beli / $total_pcs_beli) : 0;
             
             $stmt = $pdo->prepare("UPDATE barang SET nama_barang = ?, satuan_beli = ?, isi_satuan = ?, jumlah_beli = ?, harga_beli = ?, harga_beli_pcs = ?, persen_untungk = ?, harga_jual = ?, stok_total = ?, keterangan = ? WHERE id_barang = ?");
             
-            if($stmt->execute([$nama_barang, $satuan_beli, $isi_satuan, $jumlah_beli, $harga_beli, $harga_beli / $isi_satuan, $persen_untungk, $harga_jual, $stok_total, $keterangan, $id_barang])) {
+            if($stmt->execute([$nama_barang, $satuan_beli, $isi_satuan, $jumlah_beli, $harga_beli, $harga_beli_pcs_calc, $persen_untungk, $harga_jual, $stok_total, $keterangan, $id_barang])) {
                 echo json_encode(['success' => true, 'message' => 'Barang berhasil diupdate']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Gagal mengupdate barang']);

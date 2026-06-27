@@ -27,6 +27,7 @@ function TambahBarang() {
   });
   const [message, setMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
 
   const userData = localStorage.getItem('user');
   if (!userData) {
@@ -160,8 +161,13 @@ function TambahBarang() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
+    setShowSaveConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setShowSaveConfirmModal(false);
     try {
       const dataToSend = {
         ...formData,
@@ -194,6 +200,9 @@ function TambahBarang() {
         harga_beli: '',
         persen_untungk: ''
       });
+      if (!isEditing) {
+        generateNextId();
+      }
       setCalculated({
         total_pcs: 0,
         stok_total: 0,
@@ -237,81 +246,132 @@ function TambahBarang() {
         <button className="btn-back" onClick={() => navigate('/tabel-barang')}>← Kembali ke Tabel</button>
         
         {/* Form Section */}
-        <div className="form-card">
-          <h2 className="form-title">{isEditing ? 'EDIT BARANG' : 'TAMBAH BARANG'}</h2>
+        <form onSubmit={handleSubmit} className="tb-unified-card">
+          <div className="tb-unified-header">
+            <div className="tb-unified-icon">📦</div>
+            <div className="tb-unified-header-text">
+              <h2>{isEditing ? 'Edit Barang' : 'Tambah Barang Baru'}</h2>
+              <p>Masukkan detail barang dan atur margin keuntungan</p>
+            </div>
+          </div>
           
           {message && (
-            <div className={`alert ${message.includes('berhasil') ? 'alert-success' : 'alert-error'}`}>
-              {message}
+            <div style={{padding: '0 35px'}}>
+              <div className={`alert ${message.includes('berhasil') ? 'alert-success' : 'alert-error'}`}>
+                {message}
+              </div>
             </div>
           )}
           
-          <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>ID Barang</label>
-                <input type="text" name="id_barang" value={formData.id_barang} readOnly className="result-input" />
+          <div className="tb-unified-body">
+            <div className="tb-unified-left">
+              
+              <div className="tb-section-block">
+                <h3 className="tb-section-title-new"><span>❖</span> INFORMASI DASAR</h3>
+                <div className="tb-grid-row">
+                  <div className="form-group">
+                    <label>ID Barang</label>
+                    <input type="text" name="id_barang" value={formData.id_barang} readOnly className="tb-input-disabled" />
+                    <span className="tb-input-hint">*Dibuat otomatis oleh sistem</span>
+                  </div>
+                  <div className="form-group">
+                    <label>Nama Barang</label>
+                    <input type="text" name="nama_barang" value={formData.nama_barang} onChange={handleInputChange} required placeholder="Kemeja Pria" />
+                  </div>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Nama Barang</label>
-                <input type="text" name="nama_barang" value={formData.nama_barang} onChange={handleInputChange} required placeholder="Kemeja Pria" />
+
+              <hr className="tb-divider" />
+
+              <div className="tb-section-block">
+                <h3 className="tb-section-title-new"><span>$</span> DETAIL PEMBELIAN</h3>
+                <div className="tb-grid-row">
+                  <div className="form-group">
+                    <label>Satuan Pembelian</label>
+                    <select name="satuan_beli" value={formData.satuan_beli} onChange={handleInputChange}>
+                      <option value="DUS">DUS (Karton)</option>
+                      <option value="PACK">PACK</option>
+                      <option value="RENCENG">RENCENG</option>
+                      <option value="KALENG">KALENG</option>
+                      <option value="LUSIN">LUSIN</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Isi per {formData.satuan_beli || 'DUS'}</label>
+                    <div className="tb-input-suffix-wrapper">
+                      <input type="number" name="isi_satuan" value={formData.isi_satuan} onChange={handleInputChange} min="1" placeholder="10" />
+                      <span className="tb-suffix">pcs</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="tb-grid-row">
+                  <div className="form-group">
+                    <label>Jumlah Beli</label>
+                    <div className="tb-input-suffix-wrapper">
+                      <input type="number" name="jumlah_beli" value={formData.jumlah_beli} onChange={handleInputChange} min="1" placeholder="3" />
+                      <span className="tb-suffix">{formData.satuan_beli ? formData.satuan_beli.toLowerCase() : 'dus'}</span>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Harga Beli (Total)</label>
+                    <div className="tb-input-prefix-wrapper">
+                      <span className="tb-prefix">Rp</span>
+                      <input type="number" name="harga_beli" value={formData.harga_beli} onChange={handleInputChange} placeholder="500000" />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Satuan</label>
-                <select name="satuan_beli" value={formData.satuan_beli} onChange={handleInputChange}>
-                  <option value="DUS">DUS</option>
-                  <option value="PACK">PACK</option>
-                  <option value="RENCENG">RENCENG</option>
-                  <option value="KALENG">KALENG</option>
-                  <option value="LUSIN">LUSIN</option>
-                </select>
+
+              <hr className="tb-divider" />
+
+              <div className="tb-section-block">
+                <h3 className="tb-section-title-new"><span>📈</span> MARGIN KEUNTUNGAN</h3>
+                <div className="tb-grid-row">
+                  <div className="form-group">
+                    <label>Target Keuntungan</label>
+                    <div className="tb-input-suffix-wrapper">
+                      <input type="number" name="persen_untungk" value={formData.persen_untungk} onChange={handleInputChange} placeholder="20" />
+                      <span className="tb-suffix">%</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Isi</label>
-                <input type="number" name="isi_satuan" value={formData.isi_satuan} onChange={handleInputChange} min="1" placeholder="10" />
+
+            </div>
+
+            <div className="tb-unified-right">
+              <div className="tb-summary-box">
+                <h3 className="tb-summary-box-title"><span>📋</span> Ringkasan Kalkulasi</h3>
+                
+                <div className="tb-summary-line">
+                  <span className="tb-summary-line-label">Total Pcs</span>
+                  <span className="tb-summary-line-value">{calculated.total_pcs} pcs</span>
+                </div>
+                
+                <div className="tb-summary-line">
+                  <span className="tb-summary-line-label">Modal per Pcs</span>
+                  <span className="tb-summary-line-value">{formatRupiah(calculated.harga_beli_pcs)}</span>
+                </div>
+                
+                <div className="tb-summary-line">
+                  <span className="tb-summary-line-label">Untung per Pcs</span>
+                  <span className="tb-summary-line-value tb-text-profit">+{formatRupiah(calculated.profit_pcs)}</span>
+                </div>
+
+                <div className="tb-suggested-price">
+                  <div className="tb-sp-label-new">SARAN HARGA JUAL</div>
+                  <div className="tb-sp-val-new">{formatRupiah(calculated.harga_jual)}</div>
+                  <div className="tb-sp-unit-new">/ pcs</div>
+                </div>
               </div>
             </div>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label>Jumlah Beli</label>
-                <input type="number" name="jumlah_beli" value={formData.jumlah_beli} onChange={handleInputChange} min="1" placeholder="3" />
-              </div>
-              <div className="form-group">
-                <label>Harga Beli (Total)</label>
-                <input type="number" name="harga_beli" value={formData.harga_beli} onChange={handleInputChange} placeholder="500000" />
-              </div>
-              <div className="form-group">
-                <label>Total Pcs</label>
-                <input type="text" value={calculated.total_pcs + ' pcs'} readOnly className="result-input" />
-              </div>
-              <div className="form-group">
-                <label>Hbeli/Pcs</label>
-                <input type="text" value={formatRupiah(calculated.harga_beli_pcs)} readOnly className="result-input" />
-              </div>
-              <div className="form-group">
-                <label>% Untung</label>
-                <input type="number" name="persen_untungk" value={formData.persen_untungk} onChange={handleInputChange} placeholder="Masukkan %" />
-              </div>
-            </div>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label>Keuntungan/Pcs</label>
-                <input type="text" value={formatRupiah(calculated.profit_pcs)} readOnly className="result-input profit-input" />
-              </div>
-              <div className="form-group">
-                <label>Harga Jual</label>
-                <input type="text" value={formatRupiah(calculated.harga_jual)} readOnly className="result-input highlight" />
-              </div>
-            </div>
-            
-            <div className="button-row">
-              <button type="submit" className="btn-simpan">SIMPAN BARANG</button>
-              <button type="button" className="btn-batal" onClick={() => navigate('/tabel-barang')}>BATAL</button>
-            </div>
-          </form>
-        </div>
+          </div>
+
+          <div className="tb-unified-footer">
+            <button type="button" className="tb-btn-cancel" onClick={() => navigate('/tabel-barang')}>✕ Batal</button>
+            <button type="submit" className="tb-btn-save">💾 Simpan Barang</button>
+          </div>
+        </form>
 
         {/* Table Section */}
         <div className="table-card">
@@ -324,9 +384,7 @@ function TambahBarang() {
                   <th>Nama</th>
                   <th>Satuan</th>
                   <th>Isi</th>
-                  <th>Jml Beli</th>
                   <th>Harga Beli</th>
-                  <th>Stok Total</th>
                   <th>Hbeli/Pcs</th>
                   <th>% Untung</th>
                   <th>Untung/Pcs</th>
@@ -342,9 +400,7 @@ function TambahBarang() {
                       <td>{item.nama_barang}</td>
                       <td>{item.satuan_beli}</td>
                       <td>{item.isi_satuan}</td>
-                      <td>{item.jumlah_beli || '-'}</td>
                       <td>{formatRupiah(item.harga_beli)}</td>
-                      <td>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                       <td>{formatRupiah(item.harga_beli_pcs)}</td>
                       <td>{item.persen_untungk}%</td>
                       <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
@@ -354,7 +410,7 @@ function TambahBarang() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="12" className="empty">Belum ada barang</td>
+                    <td colSpan="10" className="empty">Belum ada barang</td>
                   </tr>
                 )}
               </tbody>
@@ -368,6 +424,23 @@ function TambahBarang() {
           <div className="success-modal-content">
             <div className="success-icon">✓</div>
             <p>Berhasil ditambahkan</p>
+          </div>
+        </div>
+      )}
+
+      {showSaveConfirmModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal-content">
+            <h3>Konfirmasi Simpan</h3>
+            <p>Apakah Anda yakin data barang sudah benar dan ingin menyimpannya?</p>
+            <div className="confirm-modal-buttons">
+              <button type="button" className="btn-confirm-yes" onClick={handleConfirmSubmit}>
+                YA
+              </button>
+              <button type="button" className="btn-confirm-no" onClick={() => setShowSaveConfirmModal(false)}>
+                TIDAK
+              </button>
+            </div>
           </div>
         </div>
       )}

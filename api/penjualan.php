@@ -25,19 +25,19 @@ switch($method) {
             $month = intval($_GET['month'] ?? date('n'));
             $year = intval($_GET['year'] ?? date('Y'));
             if ($period === 'week') {
-                $stmt = $pdo->prepare("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan WHERE MONTH(waktu) = ? AND YEAR(waktu) = ? GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC LIMIT 10");
+                $stmt = $pdo->prepare("SELECT MAX(id_barang) as id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan WHERE MONTH(waktu) = ? AND YEAR(waktu) = ? GROUP BY nama_barang ORDER BY total_terjual DESC LIMIT 10");
                 $stmt->execute([$month, $year]);
                 $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 echo json_encode($data);
                 break;
             } elseif ($period === 'month') {
-                $stmt = $pdo->prepare("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan WHERE MONTH(waktu) = ? AND YEAR(waktu) = ? GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC LIMIT 10");
+                $stmt = $pdo->prepare("SELECT MAX(id_barang) as id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan WHERE MONTH(waktu) = ? AND YEAR(waktu) = ? GROUP BY nama_barang ORDER BY total_terjual DESC LIMIT 10");
                 $stmt->execute([$month, $year]);
                 $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 echo json_encode($data);
                 break;
             } else {
-                $stmt = $pdo->query("SELECT id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan GROUP BY id_barang, nama_barang ORDER BY total_terjual DESC LIMIT 10");
+                $stmt = $pdo->query("SELECT MAX(id_barang) as id_barang, nama_barang, SUM(jumlah) as total_terjual, SUM(total_harga) as total_penjualan, SUM(keuntungan) as total_keuntungan FROM penjualan GROUP BY nama_barang ORDER BY total_terjual DESC LIMIT 10");
             }
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode($data);
@@ -53,30 +53,59 @@ switch($method) {
             if ($period === 'month') {
                 $stmt = $pdo->prepare("
                     SELECT 
-                        CONCAT('Minggu ', FLOOR((DAY(waktu)-1)/7)+1) as label,
+                        DATE(waktu) as raw_date,
                         SUM(total_harga) as total_penjualan,
                         SUM(keuntungan) as total_keuntungan
                     FROM penjualan 
                     WHERE MONTH(waktu) = ? AND YEAR(waktu) = ?
-                    GROUP BY FLOOR((DAY(waktu)-1)/7)
-                    ORDER BY MIN(waktu)
+                    GROUP BY DATE(waktu)
+                    ORDER BY DATE(waktu)
                 ");
                 $stmt->execute([$month, $year]);
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                // Fill missing days - get all days in month
                 $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
                 $dataByDay = [];
                 foreach ($rows as $row) {
-                    $dataByDay[$row['label']] = $row;
+                    $dataByDay[$row['raw_date']] = $row;
                 }
                 $result = [];
                 for ($d = 1; $d <= $daysInMonth; $d++) {
                     $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $d);
-                    $label = $dateStr;
                     $result[] = [
-                        'label' => $label,
-                        'total_penjualan' => isset($dataByDay[$label]) ? $dataByDay[$label]['total_penjualan'] : 0,
-                        'total_keuntungan' => isset($dataByDay[$label]) ? $dataByDay[$label]['total_keuntungan'] : 0,
+                        'label' => sprintf('%02d/%02d', $d, $month),
+                        'total_penjualan' => isset($dataByDay[$dateStr]) ? floatval($dataByDay[$dateStr]['total_penjualan']) : 0,
+                        'total_keuntungan' => isset($dataByDay[$dateStr]) ? floatval($dataByDay[$dateStr]['total_keuntungan']) : 0,
+                    ];
+                }
+                echo json_encode($result);
+                break;
+            } elseif ($period === 'year') {
+                // Per bulan untuk tahun yang dipilih
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        MONTH(waktu) as bulan_ke,
+                        SUM(total_harga) as total_penjualan,
+                        SUM(keuntungan) as total_keuntungan
+                    FROM penjualan 
+                    WHERE YEAR(waktu) = ?
+                    GROUP BY bulan_ke
+                    ORDER BY bulan_ke
+                ");
+                $stmt->execute([$year]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                $dataByMonth = [];
+                foreach ($rows as $row) {
+                    $dataByMonth[intval($row['bulan_ke'])] = $row;
+                }
+
+                $monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+                $result = [];
+                for ($m = 1; $m <= 12; $m++) {
+                    $result[] = [
+                        'label' => $monthsList[$m - 1],
+                        'total_penjualan' => isset($dataByMonth[$m]) ? floatval($dataByMonth[$m]['total_penjualan']) : 0,
+                        'total_keuntungan' => isset($dataByMonth[$m]) ? floatval($dataByMonth[$m]['total_keuntungan']) : 0,
                     ];
                 }
                 echo json_encode($result);
@@ -147,6 +176,17 @@ switch($method) {
             break;
         }
         
+        if ($filter === 'range') {
+            // Get transactions within custom date range grouped by waktu
+            $startDate = $_GET['start_date'] ?? date('Y-m-d');
+            $endDate = $_GET['end_date'] ?? date('Y-m-d');
+            $stmt = $pdo->prepare("SELECT waktu, SUM(jumlah) as total_jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as total_keuntungan, GROUP_CONCAT(nama_barang SEPARATOR ', ') as nama_barang_list FROM penjualan WHERE DATE(waktu) BETWEEN ? AND ? GROUP BY waktu ORDER BY waktu DESC, id_penjualan DESC");
+            $stmt->execute([$startDate, $endDate]);
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode($data);
+            break;
+        }
+
         if ($filter === 'daily') {
             // Get today's transactions grouped by waktu (timestamp)
             $stmt = $pdo->prepare("SELECT waktu, SUM(jumlah) as total_jumlah, SUM(total_harga) as total_harga, SUM(keuntungan) as total_keuntungan, GROUP_CONCAT(nama_barang SEPARATOR ', ') as nama_barang_list FROM penjualan WHERE DATE(waktu) = ? GROUP BY waktu ORDER BY waktu DESC, id_penjualan DESC");

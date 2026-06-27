@@ -127,10 +127,11 @@ const processedData = sortedHistory.map((item, index) => {
     doc.text('Riwayat Stok Keluar - Berty Shop', 14, 16);
     autoTable(doc, {
       startY: 20,
-      head: [['No', 'Tanggal', 'ID', 'Nama Barang', 'Stok Awal', 'Stok Keluar', 'Stok Total']],
+      head: [['No', 'Tanggal', 'ID Pjln', 'ID Brg', 'Nama Barang', 'Stok Awal', 'Stok Keluar', 'Stok Total']],
       body: stokKeluarData.map((item, index) => [
         index + 1,
         item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-',
+        `TRX-${item.id_history}`,
         item.id_barang_display || '-',
         item.nama_barang,
         Math.max(0, parseInt(item.stok_awal) || 0),
@@ -145,7 +146,8 @@ const processedData = sortedHistory.map((item, index) => {
     const data = stokKeluarData.map((item, index) => ({
       No: index + 1,
       Tanggal: item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-',
-      ID: item.id_barang_display || '-',
+      'ID Penjualan': `TRX-${item.id_history}`,
+      'ID Barang': item.id_barang_display || '-',
       'Nama Barang': item.nama_barang,
       'Stok Awal': Math.max(0, parseInt(item.stok_awal) || 0),
       'Stok Keluar': parseInt(item.stok_keluar) || 0,
@@ -189,7 +191,8 @@ const processedData = sortedHistory.map((item, index) => {
                   <tr>
                     <th>No</th>
                     <th>Tanggal</th>
-                    <th>ID</th>
+                    <th>ID Penjualan</th>
+                    <th>ID Barang</th>
                     <th>Nama Barang</th>
                     <th>Stok Awal</th>
                     <th>Stok Keluar (-)</th>
@@ -207,6 +210,7 @@ const processedData = sortedHistory.map((item, index) => {
                         <tr key={item.id_history + '_' + index}>
                           <td>{index + 1}</td>
                           <td>{displayDate}</td>
+                          <td style={{fontWeight: 'bold'}}>TRX-{item.id_history}</td>
                           <td>{item.id_barang_display || '-'}</td>
                           <td>{item.nama_barang}</td>
                           <td>{stokAwalVal}</td>

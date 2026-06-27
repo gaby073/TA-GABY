@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import './OwnerDashboard.css';
+import GrafikPenjualan from './GrafikPenjualan';
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const YEARS = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
@@ -205,7 +206,7 @@ function OwnerDashboard() {
       fetchProdukData('month', produkMonth, produkYear);
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchChartData, fetchProdukData, chartFilter, produkFilter]);
+  }, [fetchChartData, fetchProdukData, chartFilter, chartMonth, chartYear, produkFilter, produkMonth, produkYear]);
 
   useEffect(() => { fetchChartData(chartFilter, chartMonth, chartYear); }, [chartFilter, chartMonth, chartYear, fetchChartData]);
   useEffect(() => { fetchProdukData('month', produkMonth, produkYear); }, [produkMonth, produkYear, fetchProdukData]);
@@ -262,30 +263,8 @@ function OwnerDashboard() {
             {/* Charts berdampingan */}
             <div className="charts-row">
               {/* Chart Penjualan & Keuntungan */}
-              <div className="content-section chart-half">
-                <div className="section-header">
-                  <h2><i className="fas fa-chart-line"></i> Penjualan &amp; Keuntungan</h2>
-                </div>
-                <div className="chart-filter-bar">
-                  <button className={`filter-btn ${chartFilter === 'week' ? 'active' : ''}`} onClick={() => setChartFilter('week')}>Per Minggu</button>
-                  <select className="chart-select" value={chartMonth} onChange={e => setChartMonth(Number(e.target.value))}>
-                    {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
-                  </select>
-                  <select className="chart-select" value={chartYear} onChange={e => setChartYear(Number(e.target.value))}>
-                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
-                <div className="chart-wrapper">
-                  {chartData.length > 0 ? (
-                    <Line
-                      data={{ labels: chartData.map(d => d.label), datasets: [
-                        { label: 'Penjualan', data: chartData.map(d => parseFloat(d.total_penjualan || 0)), borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', tension: 0.4, fill: true },
-                        { label: 'Keuntungan', data: chartData.map(d => parseFloat(d.total_keuntungan || 0)), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,0.1)', tension: 0.4, fill: true }
-                      ]}}
-                      options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: ctx => formatRupiah(ctx.raw) } } }, scales: { y: { ticks: { callback: val => 'Rp ' + (val/1000).toFixed(0) + 'k' } } } }}
-                    />
-                  ) : <p className="no-data">Belum ada data</p>}
-                </div>
+              <div className="content-section chart-half" style={{ padding: 0, backgroundColor: 'transparent', boxShadow: 'none' }}>
+                <GrafikPenjualan />
               </div>
 
               {/* Chart Produk Terlaris */}
@@ -401,6 +380,14 @@ function OwnerDashboard() {
       {/* Sidebar */}
       <div className="owner-sidebar">
         <div className="sidebar-header">
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <img 
+              src="/berty.png" 
+              alt="Berty Shop Logo" 
+              style={{ width: '100px', height: '100px', objectFit: 'contain' }} 
+              onError={(e) => { e.target.style.display = 'none'; }} // Menyembunyikan jika gambar gagal dimuat
+            />
+          </div>
           <h2><span>Berty Shop</span></h2>
           <div className="owner-name">Owner: {user.username}</div>
         </div>
@@ -487,7 +474,7 @@ function LaporanKeuntungan() {
       } else if (filter === 'weekly') {
         url += `&month=${month}&year=${year}&week=${week}`;
       } else if (filter === 'monthly') {
-        url += `&date=${date}`;
+        url += `&date=${year}-${String(month).padStart(2, '0')}-01`;
       }
       const response = await api.get(url);
       const data = response.data;
@@ -683,12 +670,14 @@ function LaporanKeuntungan() {
 
           {filter === 'monthly' && (
             <div className="date-picker">
-              <label>Tanggal: </label>
-              <input 
-                type="date" 
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <label>Bulan: </label>
+              <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+                {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              </select>
+              <label>Tahun: </label>
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
             </div>
           )}
       </div>

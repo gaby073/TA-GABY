@@ -1,0 +1,215 @@
+.grafik-container {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  padding: 24px;
+  margin-bottom: 30px;
+  border: 1px solid #eef2f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.grafik-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.grafik-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.grafik-icon {
+  background-color: #eef2f6;
+  color: #3b82f6;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grafik-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.grafik-title p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.grafik-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.grafik-toggle {
+  display: flex;
+  background-color: #f1f5f9;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.grafik-toggle-btn {
+  border: none;
+  background: none;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.grafik-toggle-btn.active {
+  background-color: #ffffff;
+  color: #3b82f6;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.grafik-select {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #334155;
+  background-color: #ffffff;
+  outline: none;
+  cursor: pointer;
+}
+
+.grafik-select:focus {
+  border-color: #3b82f6;
+}
+
+.grafik-kpis {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.grafik-kpi-card {
+  flex: 1;
+  padding: 20px;
+  border-radius: 12px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grafik-kpi-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.grafik-kpi-green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.grafik-kpi-title {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.grafik-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.grafik-kpi-sub {
+  font-size: 12px;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.grafik-chart-area {
+  height: 300px;
+  width: 100%;
+}
+
+.custom-tooltip {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  border: 1px solid #e2e8f0;
+}
+
+.custom-tooltip .label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-row .label-name {
+  font-weight: 500;
+}
+
+.tooltip-row .value {
+  font-weight: 600;
+}
+
+.tooltip-row.penjualan {
+  color: #3b82f6;
+}
+
+.tooltip-row.keuntungan {
+  color: #10b981;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.penjualan { background-color: #3b82f6; }
+.legend-dot.keuntungan { background-color: #10b981; }

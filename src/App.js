@@ -10,6 +10,7 @@ import StokKeluar from './components/StokKeluar';
 import TransaksiPenjualan from './components/TransaksiPenjualan';
 import RiwayatPenjualan from './components/RiwayatPenjualan';
 import OwnerDashboard from './components/owner/OwnerDashboard';
+import StrukGrosir from './components/StrukGrosir';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Route path="/stok-keluar" element={<StokKeluar />} />
         <Route path="/transaksi-penjualan" element={<TransaksiPenjualan />} />
         <Route path="/riwayat-penjualan" element={<RiwayatPenjualan />} />
+        <Route path="/struk-grosir" element={<StrukGrosir />} />
         <Route path="/owner-dashboard" element={<OwnerDashboard />} />
       </Routes>
     </Router>

@@ -4,13 +4,18 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: login.html');
     exit;
 }
+require_once 'config.php';
+$stmt = $pdo->query("SELECT * FROM barang ORDER BY id_barang DESC");
+$barang = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$totalStok = array_sum(array_column($barang, 'stok_total'));
+$jenisBarang = count($barang);
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Berty Shop</title>
+    <title>Kasir Dashboard - Berty Shop</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -390,7 +395,7 @@ if (!isset($_SESSION['user_id'])) {
     <div class="sidebar">
         <div class="sidebar-header">
             <h2><i class="fas fa-store"></i> <span>Berty Shop</span></h2>
-            <div class="admin-name">Admin: <?php echo htmlspecialchars($_SESSION['username']); ?></div>
+            <div class="kasir-name">Kasir: <?php echo htmlspecialchars($_SESSION['username']); ?></div>
         </div>
         
         <ul class="sidebar-menu">
@@ -436,7 +441,7 @@ if (!isset($_SESSION['user_id'])) {
             <div class="stat-card">
                 <div class="stat-icon orange"><i class="fas fa-boxes"></i></div>
                 <div class="stat-info">
-                    <h3>48</h3>
+                    <h3><?php echo $jenisBarang; ?></h3>
                     <p>Jenis Barang</p>
                 </div>
             </div>
@@ -506,45 +511,33 @@ if (!isset($_SESSION['user_id'])) {
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Kode Barang</th>
+                        <th>Kode</th>
                         <th>Nama Barang</th>
-                        <th>Kategori</th>
-                        <th>Harga</th>
-                        <th>Stok</th>
+                        <th>Satuan</th>
+                        <th>Isi</th>
+                        <th>Jumlah Beli</th>
+                        <th>Harga Beli</th>
+                        <th>Harga Jual</th>
+                        <th>Stok Total</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php foreach ($barang as $b): ?>
                     <tr>
-                        <td>BRG-001</td>
-                        <td>Kemeja Pria Lengan Panjang</td>
-                        <td>Pakaian</td>
-                        <td>Rp 150.000</td>
-                        <td>45</td>
+                        <td><?php echo htmlspecialchars($b['id_barang']); ?></td>
+                        <td><?php echo htmlspecialchars($b['nama_barang']); ?></td>
+                        <td><?php echo htmlspecialchars($b['satuan_beli']); ?></td>
+                        <td><?php echo htmlspecialchars($b['isi_satuan']); ?></td>
+                        <td><?php echo htmlspecialchars($b['jumlah_beli']); ?></td>
+                        <td>Rp <?php echo number_format($b['harga_beli']); ?></td>
+                        <td>Rp <?php echo number_format($b['harga_jual']); ?></td>
+                        <td><?php echo htmlspecialchars($b['stok_total']); ?></td>
                         <td>
                             <button class="btn btn-success">Edit</button>
                         </td>
                     </tr>
-                    <tr>
-                        <td>BRG-002</td>
-                        <td>Celana Jeans Slimfit</td>
-                        <td>Pakaian</td>
-                        <td>Rp 200.000</td>
-                        <td>30</td>
-                        <td>
-                            <button class="btn btn-success">Edit</button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>BRG-003</td>
-                        <td>Sepatu Sneakers</td>
-                        <td>Sepatu</td>
-                        <td>Rp 350.000</td>
-                        <td>25</td>
-                        <td>
-                            <button class="btn btn-success">Edit</button>
-                        </td>
-                    </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>

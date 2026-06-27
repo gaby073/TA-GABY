@@ -160,6 +160,14 @@ function TabelBarang() {
       <div className="admin-sidebar">
         <div className="sidebar-header">
           <h2><i className="fas fa-store"></i> <span>Berty Shop</span></h2>
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <img 
+              src="/berty.png" 
+              alt="Berty Shop Logo" 
+              style={{ width: '100px', height: '100px', objectFit: 'contain' }} 
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
           <div className="admin-name">Admin: {user.username}</div>
         </div>
         
@@ -196,9 +204,7 @@ function TabelBarang() {
                 <th>Nama</th>
                 <th>Satuan</th>
                 <th>Isi</th>
-                <th>Jml Beli</th>
                 <th>Harga Beli</th>
-                <th>Stok Total</th>
                 <th>Hbeli/Pcs</th>
                 <th>% Untung</th>
                 <th>Untung/Pcs</th>
@@ -215,9 +221,7 @@ function TabelBarang() {
                     <td>{item.nama_barang}</td>
                     <td>{item.satuan_beli}</td>
                     <td>{item.isi_satuan}</td>
-                    <td>{item.jumlah_beli || '-'}</td>
                     <td>{formatRupiah(item.harga_beli)}</td>
-                    <td>{item.stok_total !== undefined && item.stok_total !== null ? item.stok_total : '-'}</td>
                     <td>{formatRupiah(item.harga_beli_pcs)}</td>
                     <td>{item.persen_untungk}%</td>
                     <td>{formatRupiah(item.harga_jual - item.harga_beli_pcs)}</td>
@@ -231,7 +235,7 @@ function TabelBarang() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="13" style={{textAlign: 'center'}}>Tidak ada data barang</td>
+                  <td colSpan="11" style={{textAlign: 'center'}}>Tidak ada data barang</td>
                 </tr>
               )}
             </tbody>

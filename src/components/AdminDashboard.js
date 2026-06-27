@@ -152,6 +152,14 @@ function AdminDashboard() {
       <div className="admin-sidebar">
         <div className="sidebar-header">
           <h2><i className="fas fa-store"></i> <span>Berty Shop</span></h2>
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <img 
+              src="/berty.png" 
+              alt="Berty Shop Logo" 
+              style={{ width: '100px', height: '100px', objectFit: 'contain' }} 
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
           <div className="admin-name">Admin: {user.username}</div>
         </div>
         
